@@ -1,0 +1,13 @@
+*.swp
+*.swap
+*.temp
+*.tmp
+build/
+temp/
+_*
+*.out
+a.awk
+*.i
+yy.tab.h
+packed.i
+config.h
