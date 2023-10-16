@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -11,16 +12,21 @@
 #include <pcre2posix.h>
 #include <gc.h>
 
-#define INNER_HASH 16
+#include "squawk.h"
+
+#define INNER_HASH 		121
+#define SYMTBL_LEN_STEP		64
+
+typedef enum Symtype { 
+		PIPE, STREAM, STRING, 
+		INT, FLOAT, FUNCTION, NONE,
+} symtype_t;
 
 typedef struct Symbol {
-	uintptr_t value;
-	bool      defined;
-	enum Symtype { 
-		PIPE, STREAM, STRING, 
-		INT, FLOAT, FUNCTION, 
-		DEFAULT,
-	}	type;
+	uint64_t 	key;
+	uintptr_t	value;
+	symtype_t	type;
+	symbol_t*	next;
 } symbol_t;
 
 typedef struct Squawk {
@@ -30,21 +36,63 @@ typedef struct Squawk {
 	size_t	 	input_idx;
 	uint8_t* 	record;
 	size_t      	record_len;
+	int		argc_int;
 	uint8_t** 	argv;
-	int		argc;
-	symbol_t*	symtbl;
+	uint8_t*	argc;
+	uint8_t*	convfmt;
+	uint8_t**	environ;
+	uint8_t*	filename;
+	uint8_t*	fnr;
+	uint8_t*	fs;
+	uint8_t*	nf;
+	uint8_t*	nr;
+	uint8_t*	ofmt;
+	uint8_t*	ofs;
+	uint8_t*	ors;
+	uint8_t*	rlength;
+	uint8_t*	rs;
+	uint8_t*	rstart;
+	uint8_t*	subsep;
+	symbol_t**	symtbl;
 	size_t		symtbl_len;
+	size_t		symtbl_cnt;
 } squawk_t;
+
+typedef enum DefaultVar { 
+		Argv, Argc, Convfmt, 
+		Environ, Filename, Fnr, 
+		Fs, Nf, Nr, 
+		Ofmt, Ofs, Ors, 
+		Rlength, Rs, Rstart, Subsep, 
+} dflvar_t;
 
 static squawk_t* 	sq_state;
 
+#define STATE		sq_state
 #define INPUTS	 	sq_state->inputs
 #define INPUT		sq_state->input
 #define OUTPUT		sq_state->output
 #define RECORD		sq_state->record
 #define SYMTBL		sq_state->symtbl
 #define SYMTBL_LEN	sq_state->symtbl_len
-#define STATE		sq_state
+#define SYMTBL_CNT	sq_state->symtbl_cnt
+#define ARGC_INT	sq_state->argc_int
+#define ARGV		sq_state->argv
+#define ARGC		sq_state->argc
+#define CONVFMT		sq_state->convfmt
+#define ENVIRON		sq_state->environ
+#define FILENAME	sq_state->filename
+#define FNR		sq_state->fnr
+#define FS		sq_state->fs
+#define NF		sq_state->nf
+#define NR		sq_state->nr
+#define OFMT		sq_state->ofmt
+#define OFS		sq_state->ofs
+#define ORS		sq_state->ors
+#define RLENGTH		sq_state->rlength
+#define RS		sq_state->rs
+#define RSTART		sq_state->rstart
+#define SUBSEP		sq_state->subsep
 
 
 void do_on_exit(void) {
@@ -54,6 +102,69 @@ void do_on_exit(void) {
 void do_on_sigint(int signum) {
 	if (signum == SIGINT)
 		do_on_exit();
+}
+
+static void upsert_default_vars(void) {
+
+	uint8_t* default_vars[] = {
+		 ARGC, 	   "ARGC",
+		 CONVFMT,  "CONVFMT",
+		 FILENAME, "FILENAME",
+		 FNR, 	   "FNR",
+		 FS, 	    "FS",
+		 NF, 	    "NF",
+		 NR, 	    "NR",
+		 OFMT, 	    "OFMT",
+		 OFS, 	    "OFS",
+		 ORS, 	    "ORS",
+		 RLENGTH,   "RLENGTH",
+		 RS, 	    "RS",
+		 RSTART,    "RSTART",
+		 SUBSEP,    "SUBSEP",
+	};
+	
+	uint8_t** default_array[2] = {
+		ARGV, ENVIRON,
+	};
+
+	static uint8_t*  default_arraynames[2] = {
+		"ARGV", "ENVIRON",
+	};
+	
+	static int default_arraysize = 2;
+	static int default_size      = 28;
+	
+	int       n = 0;
+	uint8_t*  id;
+	uint8_t*  idnum;
+	char*     alloc;
+	uint8_t*  val;
+	uint8_t** arr;
+	
+	for (int i = 0; i < default_arraysize; i++)
+	{
+		id  = default_arraynames[i];
+		arr = &default_array[i][0];
+		n   = 0;
+
+		while ((val = *arr++)) {
+			int len = asprintf(&alloc, "%d", n++);
+			idnum = gc_concat_str(
+					id, alloc, 
+					strlen(id), len
+				);
+			sym_put(idnum, (uintptr_t)val, STRING);
+			free(alloc);
+		}
+	}
+	
+	for (int i = 0; i < default_size; i+=2) {
+		id   = default_vars[i + 1];
+		val  = default_vars[i];
+
+		sym_put(id, (uintptr_t)val, STRING);
+	}
+
 }
 
 static void initialize_squawk(int argc, char **argv) {
@@ -67,16 +178,31 @@ static void initialize_squawk(int argc, char **argv) {
 	}
 	atexit(do_on_exit);
 
-	STATE  = (squawk_t*)GC_MALLOC(sizeof(squawk_t));
-	SYMTBL = 
-	    (symbol_t*)GC_MALLOC(32 * sizeof(symbol_t));
-	OUTPUT = stdout;
+	extern char **environ;
+
+	STATE		= (squawk_t*)GC_MALLOC(sizeof(squawk_t));
+	ARGV   		= (uint8_t**)argv;
+	ENVIRON		= (uint8_t**)environ;
+	ARGC_INT	= argc;
+	OUTPUT 		= stdout;
+	sym_init();
+	upsert_default_vars();
 }
 
+static inline uint64_t hash64(uint8_t* s)
+{
+    uint64_t h = 0x100;
+    uint8_t  c = 0;
+    while ((c = *s++)) {
+        h ^= c;
+        h *= 1111111111111111111u;
+    }
+    return h ^ h >>32;
+}
 
 static inline uint16_t djb2_hash(uint8_t *id) {
-	uint8_t ch;
-	uint32_t hash = 0;
+	uint8_t  ch 	= 0;
+	uint16_t hash 	= 0;
 	while ((ch = *id++))
 		hash = ((hash << 5) + hash) + ch;
 	return hash;
@@ -96,22 +222,84 @@ static inline uint8_t* gc_concat_str(uint8_t *string_1,
 
 }
 
-static symbol_t* symtable_upsert(uint8_t *id, 
-				uintptr_t value, 
-				enum Symtype type) {
-	uint16_t hash = djb2_hash(id);
-	hash *= hash % INNER_HASH;
-	if (hash > SYMTBL_LEN) {
-		SYMTBL_LEN = hash;
-		SYMTBL = 
-                  (symbol_t*)GC_REALLOC(SYMTBL, SYMTBL_LEN * sizeof(symbol_t));
+static inline void sym_init(void) {
+	SYMTBL_LEN = SYMTBL_LEN_STEP;
+	SYMTBL	   = (symbol_t**)GC_MALLOC(SYMTBL_LEN * sizeof(symbol_t*));
+}
+
+static void sym_put(uint8_t *id, uintptr_t value, symtype_t type)  {
+	uint16_t   bucket = djb2_hash(id) % SYMTBL_LEN;
+	symbol_t*  table  = SYMTBL[bucket];
+
+	uint64_t key = hash64(id);
+	if (table) {
+		for (; table && table->key != key; table = table->next);
+		if (table) {
+			table->value = value;
+			return;
+		}
 	}
-	if (SYMTBL[hash - 1].defined == true)
-		return &SYMTBL[hash - 1];
-	SYMTBL[hash - 1].defined = true;
-	SYMTBL[hash - 1].value   = value;
-	SYMTBL[hash - 1].type    = type;
-	return &SYMTBL[hash - 1];
+
+	table 		= (symbol_t*)GC_MALLOC(sizeof(symbol_t));
+	table->key 	= key;
+	table->value	= value;
+	table->type    	= type;
+	table->next	= NULL;
+	SYMTBL[bucket]	= table;
+	SYMTBL_CNT++;
+
+}
+
+static symtype_t sym_get(uint8_t* id, uintptr_t* value) {
+	uint16_t  bucket  = djb2_hash(id) % SYMTBL_LEN;
+	symbol_t* table   = SYMTBL[bucket];
+
+	uint64_t key = hash64(id);
+	if (table) {
+		do {
+			if (table->key == key) {
+				*value = table->value;
+				return table->type;
+			}
+		} while ((table = table->next));
+	}
+	return NONE;
+}
+
+static void  sym_remove(uint8_t *id) {
+	uint16_t    bucket = djb2_hash(id) % SYMTBL_LEN;
+	
+	if (!SYMTBL[bucket])
+		return;
+
+	uint64_t  key = hash64(id);
+	if (SYMTBL[bucket]->key == key) {
+		SYMTBL[bucket] = SYMTBL[bucket]->next;
+		SYMTBL_CNT--;
+		return;
+	}
+
+	symbol_t* prev = SYMTBL[bucket];
+	symbol_t* curr = prev->next;
+
+	while (curr != NULL && curr->key != key) {
+		curr = curr->next;
+		prev = curr;
+	}
+
+	if (curr != NULL) {
+		symbol_t**  tblptr    = &prev->next;
+		*tblptr    	      = curr->next;
+		SYMTBL_CNT--;
+	}
+
+}
+
+static inline void sym_resize(void) {
+	if (SYMTBL_CNT >= (SYMTBL_LEN * 0.75)) {
+		SYMTBL_LEN += SYMTBL_LEN_STEP;
+		SYMTBL      = (symbol_t**)GC_REALLOC(SYMTBL, SYMTBL_LEN * sizeof(symbol_t*));
+	}
 }
 
 int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
@@ -125,9 +313,9 @@ int execute_and_rw(uint8_t* id_stream, uint8_t *id_var,
 	fflush(stdin); fflush(stdout); fflush(stderr);
 	int read_result = getline((char**)result_ptr, result_len, pipe);
 	if (id_stream)
-		symtable_upsert(id_stream, (uintptr_t)pipe, PIPE);
+		sym_put(id_stream, (uintptr_t)pipe, PIPE);
 	if (id_var)
-		symtable_upsert(id_var, (uintptr_t)result_ptr, STRING);
+		sym_put(id_var, (uintptr_t)result_ptr, STRING);
 	if (close_after) pclose(pipe);
 	return read_result;
 }
@@ -135,10 +323,10 @@ int execute_and_rw(uint8_t* id_stream, uint8_t *id_var,
 
 int main(int argc, char **argv) {
 	initialize_squawk(argc, argv);
-	printf("4444");
-	uint8_t *result_ptr;
-	size_t result_len;
-	uint8_t *array_id = gc_concat_str((uint8_t*)"myarr", (uint8_t*)"2, 2, 2", 5, 7);
-	symbol_t *sym = symtable_upsert(array_id, 222, INT);
-	printf("%p", sym);
+
+	sym_put((uint8_t*)"AV", 222, STRING);
+	uintptr_t v;
+	symtype_t t = sym_get((uint8_t*)"AV", &v);
+	sym_remove((uint8_t*)"AV");
+	t = sym_get((uint8_t*)"AV", &v);
 }
