@@ -61,5 +61,35 @@ static void free_re(void);
 
 static void compile_re(void);
 
+static void wrap_input(void);
+
+static inline void tokenize_record(void);
+
+static inline void read_record(void);
+
+static inline void pipe_open(void);
+
+static inline void file_open(void);
+
+static inline void file_scan(void);
+
+static inline void stream_read(void);
+
+static inline void stream_write(void);
+
+static inline void stream_close(void);
+
+static inline void stream_get(void);
+
+static inline void stream_put(void);
+
+static inline void ioint_get(void);
+
+static inline void ioint_put(void);
+
+static inline void iores_get(void);
+
+static inline void iores_put(void);
+
 
 #endif
