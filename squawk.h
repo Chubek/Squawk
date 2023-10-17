@@ -61,6 +61,9 @@ static void free_re(void);
 
 static void compile_re(void);
 
+ssize_t getdelim_wrap(uint8_t** lineptr, 
+		size_t* n, int delim, FILE* stream);
+
 static void wrap_input(void);
 
 static inline void tokenize_record(void);
