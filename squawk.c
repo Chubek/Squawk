@@ -437,6 +437,15 @@ static void sprint_default_vars(dflvar_t var) {
 			sprintf(&NF[0], "%lu", val);
 			sym_put("NF", (uintptr_t)NF, STRING);
 			break;
+		case Nr:
+			val = (BLKSTAT != BEGIN)
+				? RECORDS_NUM
+				: 0;
+			NR  = NULL;
+			NR  = (uint8_t*)GC_MALLOC(32);
+			sprintf(&NR[0], "%lu", val);
+			sym_put("NR", (uintptr_t)NR, STRING);
+			break;
 		case Rlength:
 			RLENGTH = NULL;
 			RLENGTH = (uint8_t*)GC_MALLOC(32);
@@ -457,9 +466,52 @@ static void sprint_default_vars(dflvar_t var) {
 
 }
 
+
+static void wrap_input(void) {
+	return; //todo
+}
+
+static inline void tokenize_record(void) {
+	FILE* 	 temp_stream = fmemopen((void*)RECORD, RECORD_LEN, "r");
+	int   	 temp_res;
+	size_t	 temp_len;
+	uint8_t* tmp_str;
+	while ((temp_res = getdelim(
+			&temp_str, 
+			&temp_len, 
+			FS, 
+			temp_stream) > 0)) {
+		FIELDS = 
+		   (uint8_t**)GC_REALLOC(++FILEDS_NUM * sizeof(uint8_t*));
+		FILEDS[FIELDS_NUM - 1] = (uint8_t*)GC_MALLOC(temp_len);
+		u8_strncpy(
+			&FIELDS[FIELDS_NUM - 1][0], 
+			&temp_str[0], 
+			temp_len);
+		sprint_default_vars(Nf);
+		free(temp_str);
+		continue;
+	} else {
+		fclose(temp_stream);
+	}
+}
+
 static inline void read_record(void) {
-	if (getdelim(&RECORD, &RECORD_LEN, RS, INPUT) < 0)
-		wrap_input;
+	uint8_t* temp_record;
+	size_t	 temp_len;
+
+	if (getdelim(&temp_record, &temp_len, RS, INPUT) < 0)
+		wrap_input();
+	else {
+		RECORD = (uint8_t*)GC_MALLOC(temp_len);
+		u8_strncpy(&RECORD[0], &temp_record[0], temp_len);
+		RECORD_LEN = temp_len;
+		RECORD_NUM++;
+		sprint_default_vars(Nr);
+		sprint_default_vars(Fnr);
+		free(temp_record);
+		return;
+	}
 }
 
 static inline void pipe_open(void) {
@@ -474,6 +526,31 @@ static inline void file_open(void) {
 		perror("fopen");
 		exit(EX_IOERR);
 	}
+}
+
+static inline void file_scan(void) {
+	FILE* 		temp_stream = INPUT;
+	uint8_t*	temp_record;
+	size_t		temp_len;
+
+	re_compile();
+	while (getdelim(&temp_record, &temp_len, RS, temp_stream) > 0) {
+		RE_INPUT = temp_record;
+		if (re_match()) {
+			RECORD = (uint8_t*)GC_MALLOC(temp_len);
+			u8_strncpy(&RECORD[0], &temp_record[0], temp_len);
+			RECORD_LEN = temp_len;
+			RECORD_NUM++;
+			sprint_default_vars(Nr);
+			sprint_default_vars(Fnr);
+			free(temp_record);
+			return;
+		} else {
+			free(temp_record);
+			continue;
+		}
+	}
+	wrap_input();
 }
 
 static inline void stream_read(void) {
@@ -529,5 +606,4 @@ static inline void iores_put(void) {
 int main(int argc, char **argv) {
 	initialize_squawk(argc, argv);
 
-	sprint_default_vars(Argc);
 }
