@@ -104,7 +104,7 @@ void do_on_sigint(int signum) {
 		do_on_exit();
 }
 
-static void upsert_default_vars(void) {
+static void put_default_vars(void) {
 
 	uint8_t* default_vars[] = {
 		 ARGC, 	   "ARGC",
@@ -181,7 +181,7 @@ static void initialize_squawk(int argc, char **argv) {
 	ARGC_INT	= argc;
 	OUTPUT 		= stdout;
 	sym_init();
-	upsert_default_vars();
+	put_default_vars();
 }
 
 static inline uint64_t hash64(uint8_t* s)
@@ -320,7 +320,7 @@ static inline void sym_resize(void) {
 	}
 }
 
-int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
+static int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
 				const uint8_t* command, 
 				const char *mode,
 				uint8_t **result_ptr, 

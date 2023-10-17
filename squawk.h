@@ -47,7 +47,7 @@ static inline void sym_array_put(uint8_t* id,
 
 static void initialize_squawk(int argc, char **argv);
 
-static void upsert_default_vars(void);
+static void put_default_vars(void);
 
 void do_on_sigint(int signum);
 
