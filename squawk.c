@@ -20,13 +20,27 @@
 #define SYMTBL_LEN_STEP		64
 
 typedef enum Symtype { 
-		PIPE, STREAM, STRING, 
-		INT, FLOAT, FUNCTION, NONE,
+		STRING, INT, FLOAT, FUNCTION, 
+		NONE, IORES, PIPE_STREAM, IO_STREAM,
 } symtype_t;
 
 typedef enum BlockState {
 	BEGIN_BLK, END_BLK, EXPR_BLK, PATT_BLK, NOEXPR_BLK,
 } blstat_t;
+
+typedef enum IoStat {
+	READSREC = 1,
+	GETSLINE = 2,
+	REGEX	 = 4,
+	EXPR	 = 8,
+	PRINTS	 = 16,
+	READS	 = 32,
+	WRITES	 = 64,
+	APPENDS  = 128,
+	HASVAR	 = 256,
+	PIPES	 = 512,
+	CLOSES	 = 1024,
+} iostat_t;
 
 typedef struct Symbol {
 	uint64_t 	key;
@@ -75,6 +89,18 @@ typedef struct Squawk {
 	blstat_t	block_stat;
 	bool		block_range;
 	bool 		action_getline;
+	iostat_t	iostat;
+	uint8_t*	iotext;
+	uint8_t*	ioprompt;
+	uint8_t**	ioresult;
+	size_t		iotextlen;
+	size_t		iopromptlen;
+	size_t*		ioresultlen;
+	uint8_t*	iofileid;
+	uint8_t*	iovarid;
+	FILE*		iostream;
+	int 		ioint;
+	bool		ioispipe;
 } squawk_t;
 
 typedef enum DefaultVar { 
@@ -90,6 +116,7 @@ static squawk_t* 	sq_state;
 #define STATE		sq_state
 #define INPUTS	 	sq_state->inputs
 #define INPUT		sq_state->input
+#define INPUT_IDX	sq_state->input_idx
 #define OUTPUT		sq_state->output
 #define RECORD		sq_state->record
 #define RECORD_NUM	sq_state->record_num
@@ -125,7 +152,18 @@ static squawk_t* 	sq_state;
 #define RS		sq_state->rs
 #define RSTART		sq_state->rstart
 #define SUBSEP		sq_state->subsep
-
+#define IOSTAT		sq_state->iostat
+#define IOTEXT		sq_state->iotext
+#define IORESULT	sq_state->ioresult
+#define IORESLEN	sq_state->ioresultlen
+#define IOTXTLEN	sq_state->iotextlen
+#define IOPROMPT	sq_state->ioprompt
+#define IOPROMPTLEN	sq_state->iopromptlen
+#define IOFILEID	sq_state->iofileid
+#define IOVARID		sq_state->iovarid
+#define IOSTREAM	sq_state->iostream
+#define IOINT		sq_state->ioint
+#define IOISPIPE	sq_state->ioispipe
 
 void do_on_exit(void) {
 	fclose(OUTPUT);
@@ -139,10 +177,10 @@ void do_on_sigint(int signum) {
 static void put_default_vars(void) {
 
 	uint8_t* default_vars[] = {
-		 ARGC, 	   "ARGC",
-		 CONVFMT,  "CONVFMT",
-		 FILENAME, "FILENAME",
-		 FNR, 	   "FNR",
+		 ARGC, 	    "ARGC",
+		 CONVFMT,   "CONVFMT",
+		 FILENAME,  "FILENAME",
+		 FNR, 	    "FNR",
 		 FS, 	    "FS",
 		 NF, 	    "NF",
 		 NR, 	    "NR",
@@ -353,26 +391,6 @@ static inline void sym_resize(void) {
 	}
 }
 
-int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
-				const uint8_t* command, 
-				const char *mode,
-				uint8_t **result_ptr, 
-				size_t *result_len,
-				bool close_after) {
-	fflush(stdin); fflush(stdout); fflush(stderr);
- 	FILE *pipe = popen((char*)command, mode);
-	if (!pipe) {
-		perror("popen");
-		exit(EX_IOERR);
-	}
-	int read_result = getline((char**)result_ptr, result_len, pipe);
-	if (id_stream)
-		sym_put(id_stream, (uintptr_t)pipe, PIPE);
-	if (id_var)
-		sym_put(id_var, (uintptr_t)result_ptr, STRING);
-	if (close_after) pclose(pipe);
-	return read_result;
-}
 
 static void compile_re(void) {
 	if (pcre2_regcomp(&REGEX_CC, PATTERN, 0) < 0) {
@@ -437,6 +455,75 @@ static void sprint_default_vars(dflvar_t var) {
 
 	}
 
+}
+
+static inline void read_record(void) {
+	if (getdelim(&RECORD, &RECORD_LEN, RS, INPUT) < 0)
+		wrap_input;
+}
+
+static inline void pipe_open(void) {
+	if (!(IOSTREAM = popen(IOTEXT, IORWMODE))) {
+		perror("popen");
+		exit(EX_IOERR);
+	}
+}
+
+static inline void file_open(void) {
+	if (!(IOSTREAM = fopen(IOTEXT, IORWMODE))) {
+		perror("fopen");
+		exit(EX_IOERR);
+	}
+}
+
+static inline void stream_read(void) {
+	IOINT = getdelim(IORESULT, IORESLEN, RS, IOSTREAM);
+	
+}
+
+static inline void stream_write(void) {
+	IOINT = fputs(IOTEXT, IOSTREAM);
+}
+
+static inline void stream_close(void) {
+	IOISPIPE ? pclose(IOSTREAM) : fclose(IOSTREAM);
+}
+
+static inline void stream_get(void) {
+	uintptr_t value 	= 0;
+	symtype_t symbol_type 	= sym_get(IOTEXT, &value);
+	if (symbol_type != NONE) {
+		if (symbol_type == PIPE_STREAM)
+			IOSTAT 		|= PIPES;
+		IOSTREAM = (FILE*)value;
+	}
+}
+
+static inline void stream_put(void) {
+	sym_put(IOTEXT, (uintptr_t)IOSTREAM, 
+			IOISPIPE ? PIPE_STREAM : IO_STREAM);
+}
+
+static inline void ioint_get(void) {
+	uintptr_t value		= 0;
+	symtype_t symbol_type	= sym_get(IOFILEID, &value);
+	if (symbol_type == INT)
+		IOINT = (int)value;
+}
+
+static inline void ioint_put(void) {
+	sym_put(IOFILEID, (uintptr_t)IOINT, INT);
+}
+
+static inline void iores_get(void) {
+	uintptr_t value 	= 0;
+	symtype_t symbol_type 	= sym_get(IOVARID, &value);
+	if (symbol_type == STRING)
+		*IORESULT = (uint8_t*)value;
+}
+
+static inline void iores_put(void) {
+	sym_put(IOVARID, (uintptr_t)(*IORESULT), STRING);
 }
 
 int main(int argc, char **argv) {
