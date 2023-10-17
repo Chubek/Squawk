@@ -136,7 +136,6 @@ static void upsert_default_vars(void) {
 	
 	int       n = 0;
 	uint8_t*  id;
-	uint8_t*  idnum;
 	char*     alloc;
 	uint8_t*  val;
 	uint8_t** arr;
@@ -149,11 +148,7 @@ static void upsert_default_vars(void) {
 
 		while ((val = *arr++)) {
 			int len = asprintf(&alloc, "%d", n++);
-			idnum = gc_concat_str(
-					id, alloc, 
-					strlen(id), len
-				);
-			sym_put(idnum, (uintptr_t)val, STRING);
+			sym_array_put(id, alloc, (uintptr_t)val, STRING);
 			free(alloc);
 		}
 	}
@@ -295,6 +290,29 @@ static void  sym_remove(uint8_t *id) {
 
 }
 
+static inline void sym_array_put(uint8_t* id, 
+				uint8_t*  index, 
+				uintptr_t value,
+				symtype_t type) {
+	uint8_t* concat = gc_concat_str(id, index,
+			u8_strlen(id), u8_strlen(index));
+	sym_put(concat, value, type);
+}
+
+static inline symtype_t sym_array_get(uint8_t* id, 
+		uint8_t*   index,
+		uintptr_t* value) {
+	uint8_t* concat = gc_concat_str(id, index, 
+			u8_strlen(id), u8_strlen(index));
+	return sym_get(concat, value);
+}
+
+static inline void sym_array_remove(uint8_t* id, uint8_t* index) {
+	uint8_t* concat = gc_concat_str(id, index,
+			u8_strlen(id), u8_strlen(index));
+	sym_remove(concat);
+}
+
 static inline void sym_resize(void) {
 	if (SYMTBL_CNT >= (SYMTBL_LEN * 0.75)) {
 		SYMTBL_LEN += SYMTBL_LEN_STEP;
@@ -325,6 +343,9 @@ int main(int argc, char **argv) {
 	initialize_squawk(argc, argv);
 
 	sym_put((uint8_t*)"AV", 222, STRING);
+	SYMTBL_CNT = 256;
+	sym_resize();
+
 	uintptr_t v;
 	symtype_t t = sym_get((uint8_t*)"AV", &v);
 	sym_remove((uint8_t*)"AV");
