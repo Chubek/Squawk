@@ -53,7 +53,13 @@ void do_on_sigint(int signum);
 
 void do_on_exit(void);
 
+static void sprint_default_vars(dflvar_t var);
 
+static bool match_re(void);
+
+static void free_re(void);
+
+static void compile_re(void);
 
 
 #endif
