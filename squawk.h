@@ -34,6 +34,16 @@ static inline uint8_t* gc_concat_str(uint8_t *string_1,
 					size_t len_string_1,
 					size_t  len_string_2);
 
+static inline void sym_array_remove(uint8_t* id, uint8_t* index);
+
+static inline symtype_t sym_array_get(uint8_t* id, 
+		uint8_t*   index,
+		uintptr_t* value);
+
+static inline void sym_array_put(uint8_t* id, 
+				uint8_t*  index, 
+				uintptr_t value,
+				symtype_t type);
 
 static void initialize_squawk(int argc, char **argv);
 
