@@ -6,7 +6,9 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
+#include <errno.h>
 #include <string.h>
+#include <sysexits.h>
 
 #include <unistr.h>
 #include <pcre2posix.h>
@@ -36,6 +38,14 @@ typedef struct Squawk {
 	size_t	 	input_idx;
 	uint8_t* 	record;
 	size_t      	record_len;
+	uint8_t**	fields;
+	size_t		fields_num;
+	regex_t		regex_cc;
+	uint8_t*	pattern;
+	uint8_t*	regex_in;
+	size_t		nmatch;
+	regmatch_t	pmatch[1];
+	regoff_t	regex_ofs;
 	int		argc_int;
 	uint8_t** 	argv;
 	uint8_t*	argc;
@@ -76,6 +86,14 @@ static squawk_t* 	sq_state;
 #define SYMTBL		sq_state->symtbl
 #define SYMTBL_LEN	sq_state->symtbl_len
 #define SYMTBL_CNT	sq_state->symtbl_cnt
+#define FIELDS		sq_state->fields
+#define FIELDS_NUM	sq_state->fields_num
+#define PMATCH		sq_state->pmatch
+#define NMATCH		sq_state->nmatch
+#define REGEX_CC	sq_state->regex_cc
+#define REGEX_OFS	sq_state->regex_ofs
+#define PATTERN		sq_state->pattern
+#define REGEX_IN	sq_state->regex_in
 #define ARGC_INT	sq_state->argc_int
 #define ARGV		sq_state->argv
 #define ARGC		sq_state->argc
@@ -179,6 +197,7 @@ static void initialize_squawk(int argc, char **argv) {
 	ARGV   		= (uint8_t**)argv;
 	ENVIRON		= (uint8_t**)environ;
 	ARGC_INT	= argc;
+	NMATCH		= 1;
 	OUTPUT 		= stdout;
 	sym_init();
 	put_default_vars();
@@ -320,7 +339,7 @@ static inline void sym_resize(void) {
 	}
 }
 
-static int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
+int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
 				const uint8_t* command, 
 				const char *mode,
 				uint8_t **result_ptr, 
@@ -328,7 +347,10 @@ static int execute_and_rw(uint8_t* id_stream, uint8_t *id_var,
 				bool close_after) {
 	fflush(stdin); fflush(stdout); fflush(stderr);
  	FILE *pipe = popen((char*)command, mode);
-	fflush(stdin); fflush(stdout); fflush(stderr);
+	if (!pipe) {
+		perror("popen");
+		exit(EX_IOERR);
+	}
 	int read_result = getline((char**)result_ptr, result_len, pipe);
 	if (id_stream)
 		sym_put(id_stream, (uintptr_t)pipe, PIPE);
@@ -338,16 +360,32 @@ static int execute_and_rw(uint8_t* id_stream, uint8_t *id_var,
 	return read_result;
 }
 
+static void compile_re(void) {
+	if (pcre2_regcomp(&REGEX_CC, PATTERN, 0) < 0) {
+		perror("pcre2_regcomp");
+		exit(EX_TEMPFAIL);
+	}
+}
+
+static void free_re(void) {
+	pcre2_regfree(&REGEX_CC);
+}
+
+static bool match_re(void) {
+	if (!pcre2_regexec(&REGEX_CC, REGEX_IN, NMATCH, PMATCH, 0)) {
+		REGEX_OFS = PMATCH[0].rm_so;
+		return true;
+	}
+	return false;
+}
 
 int main(int argc, char **argv) {
 	initialize_squawk(argc, argv);
 
-	sym_put((uint8_t*)"AV", 222, STRING);
-	SYMTBL_CNT = 256;
-	sym_resize();
+	REGEX_IN = (uint8_t*)"ETHER";
+	PATTERN = (uint8_t*)"THER";
+	compile_re();
+	match_re();
+	free_re();
 
-	uintptr_t v;
-	symtype_t t = sym_get((uint8_t*)"AV", &v);
-	sym_remove((uint8_t*)"AV");
-	t = sym_get((uint8_t*)"AV", &v);
 }
