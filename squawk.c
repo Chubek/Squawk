@@ -24,6 +24,10 @@ typedef enum Symtype {
 		INT, FLOAT, FUNCTION, NONE,
 } symtype_t;
 
+typedef enum BlockState {
+	BEGIN_BLK, END_BLK, EXPR_BLK, PATT_BLK, NOEXPR_BLK,
+} blstat_t;
+
 typedef struct Symbol {
 	uint64_t 	key;
 	uintptr_t	value;
@@ -38,6 +42,7 @@ typedef struct Squawk {
 	size_t	 	input_idx;
 	uint8_t* 	record;
 	size_t      	record_len;
+	size_t		record_num;
 	uint8_t**	fields;
 	size_t		fields_num;
 	regex_t		regex_cc;
@@ -45,7 +50,8 @@ typedef struct Squawk {
 	uint8_t*	regex_in;
 	size_t		nmatch;
 	regmatch_t	pmatch[1];
-	regoff_t	regex_ofs;
+	regoff_t	offset_init;
+	regoff_t	offset_len;
 	int		argc_int;
 	uint8_t** 	argv;
 	uint8_t*	argc;
@@ -66,6 +72,9 @@ typedef struct Squawk {
 	symbol_t**	symtbl;
 	size_t		symtbl_len;
 	size_t		symtbl_cnt;
+	blstat_t	block_stat;
+	bool		block_range;
+	bool 		action_getline;
 } squawk_t;
 
 typedef enum DefaultVar { 
@@ -83,6 +92,7 @@ static squawk_t* 	sq_state;
 #define INPUT		sq_state->input
 #define OUTPUT		sq_state->output
 #define RECORD		sq_state->record
+#define RECORD_NUM	sq_state->record_num
 #define SYMTBL		sq_state->symtbl
 #define SYMTBL_LEN	sq_state->symtbl_len
 #define SYMTBL_CNT	sq_state->symtbl_cnt
@@ -91,8 +101,12 @@ static squawk_t* 	sq_state;
 #define PMATCH		sq_state->pmatch
 #define NMATCH		sq_state->nmatch
 #define REGEX_CC	sq_state->regex_cc
-#define REGEX_OFS	sq_state->regex_ofs
+#define OFSINIT  	sq_state->offset_init
+#define OFSLEN		sq_state->offset_len
 #define PATTERN		sq_state->pattern
+#define BLKSTAT		sq_state->block_stat
+#define ACTGETLN	sq_state->action_getline
+#define BLKRANGE	sq_state->block_range
 #define REGEX_IN	sq_state->regex_in
 #define ARGC_INT	sq_state->argc_int
 #define ARGV		sq_state->argv
@@ -373,19 +387,60 @@ static void free_re(void) {
 
 static bool match_re(void) {
 	if (!pcre2_regexec(&REGEX_CC, REGEX_IN, NMATCH, PMATCH, 0)) {
-		REGEX_OFS = PMATCH[0].rm_so;
+		OFSINIT = PMATCH[0].rm_so;
+		OFSLEN  = PMATCH[0].rm_eo - OFSINIT;
 		return true;
 	}
 	return false;
 }
 
+static void sprint_default_vars(dflvar_t var) {
+	size_t val;
+	switch (var) {
+		case Argc:
+			ARGC = NULL;
+			ARGC = (uint8_t*)GC_MALLOC(32);
+			sprintf(&ARGC[0], "%d", ARGC_INT);
+			sym_put("ARGC", (uintptr_t)ARGC, STRING);
+			break;
+		case Fnr:
+			val = (BLKSTAT == BEGIN_BLK) ? 0 : RECORD_NUM;
+			FNR = NULL;
+			FNR = (uint8_t*)GC_MALLOC(32);
+			sprintf(&FNR[0], "%lu", val);
+			sym_put("FNR", (uintptr_t)FNR, STRING);
+			break;
+		case Nf:
+			val = (BLKSTAT != BEGIN_BLK && !ACTGETLN)
+				? FIELDS_NUM
+				: 0;
+			NF  = NULL;
+			NF  = (uint8_t*)GC_MALLOC(32);
+			sprintf(&NF[0], "%lu", val);
+			sym_put("NF", (uintptr_t)NF, STRING);
+			break;
+		case Rlength:
+			RLENGTH = NULL;
+			RLENGTH = (uint8_t*)GC_MALLOC(32);
+			sprintf(&RLENGTH[0], "%u", OFSLEN);
+			sym_put("RLENGTH", (uintptr_t)RLENGTH, STRING);
+			break;
+		case Rstart:
+			RSTART = NULL;
+			RSTART = (uint8_t*)GC_MALLOC(32);
+			sprintf(&RLENGTH[0], "%u", OFSINIT);
+			sym_put("RSTART", (uintptr_t)RSTART, STRING);
+			break;
+		default:
+			break;
+
+
+	}
+
+}
+
 int main(int argc, char **argv) {
 	initialize_squawk(argc, argv);
 
-	REGEX_IN = (uint8_t*)"ETHER";
-	PATTERN = (uint8_t*)"THER";
-	compile_re();
-	match_re();
-	free_re();
-
+	sprint_default_vars(Argc);
 }
