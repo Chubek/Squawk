@@ -59,6 +59,8 @@ typedef struct Squawk {
 	size_t		record_num;
 	uint8_t**	fields;
 	size_t		fields_num;
+	int		record_delim;
+	int		fields_delim;
 	regex_t		regex_cc;
 	uint8_t*	pattern;
 	uint8_t*	regex_in;
@@ -91,6 +93,7 @@ typedef struct Squawk {
 	bool 		action_getline;
 	iostat_t	iostat;
 	uint8_t*	iotext;
+	uint8_t*	iorwmode;
 	uint8_t*	ioprompt;
 	uint8_t**	ioresult;
 	size_t		iotextlen;
@@ -119,7 +122,10 @@ static squawk_t* 	sq_state;
 #define INPUT_IDX	sq_state->input_idx
 #define OUTPUT		sq_state->output
 #define RECORD		sq_state->record
+#define RECORD_LEN	sq_state->record_len
 #define RECORD_NUM	sq_state->record_num
+#define RECORD_DELIM	sq_state->record_delim
+#define FIELDS_DELIM	sq_state->fields_delim
 #define SYMTBL		sq_state->symtbl
 #define SYMTBL_LEN	sq_state->symtbl_len
 #define SYMTBL_CNT	sq_state->symtbl_cnt
@@ -164,6 +170,7 @@ static squawk_t* 	sq_state;
 #define IOSTREAM	sq_state->iostream
 #define IOINT		sq_state->ioint
 #define IOISPIPE	sq_state->ioispipe
+#define IORWMODE	sq_state->iorwmode
 
 void do_on_exit(void) {
 	fclose(OUTPUT);
@@ -438,8 +445,8 @@ static void sprint_default_vars(dflvar_t var) {
 			sym_put("NF", (uintptr_t)NF, STRING);
 			break;
 		case Nr:
-			val = (BLKSTAT != BEGIN)
-				? RECORDS_NUM
+			val = (BLKSTAT != BEGIN_BLK)
+				? RECORD_NUM
 				: 0;
 			NR  = NULL;
 			NR  = (uint8_t*)GC_MALLOC(32);
@@ -458,6 +465,16 @@ static void sprint_default_vars(dflvar_t var) {
 			sprintf(&RLENGTH[0], "%u", OFSINIT);
 			sym_put("RSTART", (uintptr_t)RSTART, STRING);
 			break;
+		case Rs:
+			RS  	= NULL;
+			RS	= (uint8_t*)GC_MALLOC(sizeof(int) + 1);
+			memmove(&RS[0], (void*)&RECORD_DELIM, sizeof(int));
+			break;
+		case Fs:
+			FS  	= NULL;
+			FS	= (uint8_t*)GC_MALLOC(sizeof(int) + 1);
+			memmove(&FS[0], (void*)&FIELDS_DELIM, sizeof(int));
+			break;
 		default:
 			break;
 
@@ -467,6 +484,11 @@ static void sprint_default_vars(dflvar_t var) {
 }
 
 
+ssize_t getdelim_wrap(uint8_t** lineptr, 
+		size_t* n, int delim, FILE* stream) {
+	return getdelim((char**)lineptr, n, delim, stream);
+}
+
 static void wrap_input(void) {
 	return; //todo
 }
@@ -475,15 +497,15 @@ static inline void tokenize_record(void) {
 	FILE* 	 temp_stream = fmemopen((void*)RECORD, RECORD_LEN, "r");
 	int   	 temp_res;
 	size_t	 temp_len;
-	uint8_t* tmp_str;
-	while ((temp_res = getdelim(
+	uint8_t* temp_str;
+	while ((temp_res = getdelim_wrap(
 			&temp_str, 
 			&temp_len, 
-			FS, 
+			FIELDS_DELIM, 
 			temp_stream) > 0)) {
 		FIELDS = 
-		   (uint8_t**)GC_REALLOC(++FILEDS_NUM * sizeof(uint8_t*));
-		FILEDS[FIELDS_NUM - 1] = (uint8_t*)GC_MALLOC(temp_len);
+		   (uint8_t**)GC_REALLOC(FIELDS, ++FIELDS_NUM * sizeof(uint8_t*));
+		FIELDS[FIELDS_NUM - 1] = (uint8_t*)GC_MALLOC(temp_len);
 		u8_strncpy(
 			&FIELDS[FIELDS_NUM - 1][0], 
 			&temp_str[0], 
@@ -491,16 +513,16 @@ static inline void tokenize_record(void) {
 		sprint_default_vars(Nf);
 		free(temp_str);
 		continue;
-	} else {
-		fclose(temp_stream);
-	}
+	} 
+	
+	fclose(temp_stream);
 }
 
 static inline void read_record(void) {
 	uint8_t* temp_record;
 	size_t	 temp_len;
 
-	if (getdelim(&temp_record, &temp_len, RS, INPUT) < 0)
+	if (getdelim_wrap(&temp_record, &temp_len, RECORD_DELIM, INPUT) < 0)
 		wrap_input();
 	else {
 		RECORD = (uint8_t*)GC_MALLOC(temp_len);
@@ -533,10 +555,11 @@ static inline void file_scan(void) {
 	uint8_t*	temp_record;
 	size_t		temp_len;
 
-	re_compile();
-	while (getdelim(&temp_record, &temp_len, RS, temp_stream) > 0) {
-		RE_INPUT = temp_record;
-		if (re_match()) {
+	compile_re();
+	while (getdelim_wrap(&temp_record, &temp_len, 
+				RECORD_DELIM, temp_stream) > 0) {
+		REGEX_IN = temp_record;
+		if (match_re()) {
 			RECORD = (uint8_t*)GC_MALLOC(temp_len);
 			u8_strncpy(&RECORD[0], &temp_record[0], temp_len);
 			RECORD_LEN = temp_len;
@@ -554,7 +577,7 @@ static inline void file_scan(void) {
 }
 
 static inline void stream_read(void) {
-	IOINT = getdelim(IORESULT, IORESLEN, RS, IOSTREAM);
+	IOINT = getdelim_wrap(IORESULT, IORESLEN, RECORD_DELIM, IOSTREAM);
 	
 }
 
