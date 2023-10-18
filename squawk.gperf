@@ -5,7 +5,8 @@
 #include <stdlib.h>
 #include <setjmp.h>
 
-#define NUM_BUILTIN 20
+#define NUM_BUILTIN		 20
+#define MAX_SPRINTF_ARGV	 2048
 
 #include <pcre2posix.h>
 #include <gc.h>
@@ -53,7 +54,6 @@ static inline void stat_argc(int num_min, int num_max) {
 #define JUMP_BACK() 	longjmp(BUF_default, 1)
 %}
 %struct-type
-%switch-num=8
 %define hash-function-name AWK_BUILTIN_LUT
 
 struct AwkBuiltin { char* name; int jmp_id; }
@@ -348,7 +348,7 @@ static void awk_split(void) {
 static void awk_sprintf(void) {
 	setjmp(BUF_sprintf) == 0 ? return : NULL;
 
-	stat_argc(1, 1024);
+	stat_argc(1, MAX_SPRINTF_ARGV);
 	
 	uint8_t*	fmt = ARGV[0];
 
@@ -358,7 +358,7 @@ static void awk_sprintf(void) {
 					(void*)str, 
 					len,
 					"w+");
-	//len = print_formatted(stream, fmt, &ARGV[2]);
+	len = print_formatted(stream, fmt, &ARGV[2]);
 
 	RESULT_TYPE = STR;
 	fgets(&STR_RES[0], len, stream);
