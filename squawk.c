@@ -629,6 +629,33 @@ static inline void iores_put(void) {
 	sym_put(IOVARID, (uintptr_t)(*IORESULT), STRING);
 }
 
+static size_t print_formatted(FILE* stream, uint8_t* fmt, uint8_t** args) {
+	uint8_t		 chr = 0;
+	uint8_t*	 arg = NULL;
+	char*		 sfm = NULL;
+	int64_t		 num = 0;;
+	size_t		 ret = 0;;
+
+
+	while ((chr = *fmt++)) {
+		if (chr == '%' && *fmt != '%' && *fmt != 's') {
+			asprintf(&sfm, "%%%c", chr);
+			arg = *args++;
+			num = atol(arg);
+			fprintf(stream, sfm, num);
+			free(sfm);
+			*fmt++;
+		} else if (chr == '%' && *fmt == 's') {
+			arg = *args++;
+			fputs(arg, stream);
+			*fmt++;
+		} else 
+			fputc(chr, stream);
+		ret++;
+	}
+	return ret;
+}
+
 int main(int argc, char **argv) {
 	initialize_squawk(argc, argv);
 
