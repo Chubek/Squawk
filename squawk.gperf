@@ -345,6 +345,26 @@ static void awk_split(void) {
 
 }
 
+static void awk_sprintf(void) {
+	setjmp(BUF_sprintf) == 0 ? return : NULL;
+
+	stat_argc(1, 1024);
+	
+	uint8_t*	fmt = ARGV[0];
+
+	size_t		len = u8_strlen(fmt);
+	uint8_t*	str = (uint8_t*)GC_MALLOC(len);
+	FILE*		stream = fmemopen(
+					(void*)str, 
+					len,
+					"w+");
+	//len = print_formatted(stream, fmt, &ARGV[2]);
+
+	RESULT_TYPE = STR;
+	fgets(&STR_RES[0], len, stream);
+
+	fclose(stream);
+}
 
 
 
