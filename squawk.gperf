@@ -218,13 +218,13 @@ static void awk_gsub(void) {
 	regex_t 	recc;
 	size_t  	nmatch = 1;
 	regmatch_t	pmatch[1];
-	regoff_t	match_init;
+	regoff_t	match_init = 0;
 	regoff_t	match_len;
 
 	pcre2_regcomp(&recc, expr, 0);
 	
 	while (int i; ; i++) {
-		if (pcre2_regexec(&regcc, inword, nmatch, pmatch, 0))
+		if (pcre2_regexec(&regcc, &inword[match_init], nmatch, pmatch, 0))
 			break;
 		
 		len += replen;
@@ -306,9 +306,42 @@ static void awk_split(void) {
 	
 	stat_argc(2, 3);
 
-	uint8_t*	str = ARGV[0];
-	uint8_t*	arr = ARGV[1];
+	RESULT_TYPE = INT;
 
+	uint8_t*	str   = ARGV[0];
+	uint8_t*	arr   = ARGV[1];
+	uint8_t*	tok   = ARGV[2] ? ARGV[2] : FS;
+
+	regex_t 	recc;
+	size_t		nmatch;
+	regmatch_t	pmatch[1];
+	regoff_t	init = 0;
+	regoff_t	len;
+	uint8_t*	idx;
+	uint8_t*	val;
+	
+	pcre2_regcomp(&recc, tok, 0);
+
+
+	for (INT_RES = 0; ; i++) {
+		if (pcre2_regexec(&recc, &str[init], nmatch, pmatch))
+			break;
+
+		
+		init = pmatch[0].rm_so;
+		len  = pmatch[0].rm_eo - init;
+
+		val  = (uint8_t*)GC_MALLOC(len + 1);
+		u8_strncpy(&val[0], &str[init], len);
+
+
+		asprintf(idx, "%d", i);
+		
+		sym_array_put(
+			arr, idx, (uintptr_t)val, STRING
+		);
+		
+	}
 
 }
 
