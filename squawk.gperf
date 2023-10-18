@@ -78,8 +78,8 @@ substr, 16
 tolower, 17
 toupper, 18
 %%
-static void atan2(void) {
-	setjmp(BUF_atan2);
+static void awk_atan2(void) {
+	setjmp(BUF_atan2) == 0 ? return : NULL;
 
 	stat_argc(2, 2);
 	long double f1 = strtold(ARGV[0], NULL);
@@ -91,8 +91,8 @@ static void atan2(void) {
 	JUMP_BACK();
 }
 
-static void cos(void) {
-	setjmp(BUF_cos);
+static void awk_cos(void) {
+	setjmp(BUF_cos) == 0  ? return : NULL;
 
 	stat_argc(1, 1);
 	long double f   = strtold(ARGV[0], NULL);
@@ -103,8 +103,8 @@ static void cos(void) {
 	JUMP_BACK();
 }
 
-static void sin(void) {
-	setjmp(BUF_sin);
+static void awk_sin(void) {
+	setjmp(BUF_sin) == 0  ? return : NULL;
 		
 	stat_argc(1, 1);
 	long double f   = strtold(ARGV[0], NULL);
@@ -115,8 +115,8 @@ static void sin(void) {
 	JUMP_BACK();
 }
 
-static void exp(void) {
-	setjmp(BUF_exp);
+static void awk_exp(void) {
+	setjmp(BUF_exp) == 0  ? return : NULL;
 
 	stat_argc(1, 1);
 	long double f   = strtold(ARGV[0], NULL);
@@ -127,8 +127,8 @@ static void exp(void) {
 	JUMP_BACK();
 }
 
-static void exp(void) {
-	setjmp(BUF_log);
+static void awk_exp(void) {
+	setjmp(BUF_log) == 0   ? return : NULL;
 
 	stat_argc(1, 1);
 	long double f   = strtold(ARGV[0], NULL);
@@ -139,8 +139,8 @@ static void exp(void) {
 	JUMP_BACK();
 }
 
-static void sqrt(void) {
-	setjmp(BUF_sqrt);
+static void awk_sqrt(void) {
+	setjmp(BUF_sqrt) == 0  ? return : NULL;
 
 	stat_argc(1, 1);
 	long double f   = strtold(ARGV[0], NULL);
@@ -151,8 +151,8 @@ static void sqrt(void) {
 	JUMP_BACK();
 }
 
-static void toint(void) {
-	setjmp(BUF_int);
+static void awk_int(void) {
+	setjmp(BUF_int) == 0 ? return : NULL;
 
 	stat_argc(1, 1);
 	long double f   = strtold(ARGV[0], NULL);
@@ -163,8 +163,8 @@ static void toint(void) {
 	JUMP_BACK();
 }
 
-static void rand(void) {
-	setjmp(BUF_rand);
+static void awk_rand(void) {
+	setjmp(BUF_rand) == 0 ? return : NULL;
 
 	stat_argc(0, 0);
 
@@ -174,8 +174,8 @@ static void rand(void) {
 	JUMP_BACK();
 }
 
-static void srand(void) {
-	setjmp(BUF_rand);
+static void awk_srand(void) {
+	setjmp(BUF_rand) == 0 ? return : NULL;
 
 	stat_argc(0, 1);
 	int64_t seed = ARGV[0] ? strtoll(ARGV[0], NULL, 10) : 0;
@@ -186,8 +186,8 @@ static void srand(void) {
 	JUMP_BACK();
 }
 
-static void gsub(void) {
-	setjmp(BUF_gsub);
+static void awk_gsub(void) {
+	setjmp(BUF_gsub) == 0 ? return : NULL;
 
 	stat_argc(2, 3);
 	uint8_t* expr    = ARGV[0];
@@ -237,13 +237,80 @@ static void gsub(void) {
 
 	}
 
-
+	JUMP_BACK();
 
 }
 
+static void awk_index(void) {
+	setjmp(BUF_index) == 0 ? return : NULL;
+
+	stat_argc(2, 2);
+
+	uint8_t*	s1 = ARGV[0];
+	uint8_t*	s2 = ARGV[1];
+
+	RESULT_TYPE 	= INT;
+	INT_RES		= ((size_t)strstr(s1, s2) - (size_t)s1) + 1;
+	
+	if (!(INT_RES >= 1))
+		INT_RES = 0;
+	
+
+	JUMP_BACK();
+}
+
+static void awk_length(void) {
+	setjmp(BUF_length) == 0 ? return : NULL;
+
+	stat_argc(0, 1);
+
+	uint8_t* 	s = ARGV[0] ? ARGV[0] : RECORD;
+
+	RESULT_TYPE	  = INT;
+	INT_RES		  = u8_strlen(s);
+
+	JUMP_BACK();
+}
+
+static void awk_match(void) {
+	setjmp(BUF_match) == 0 ? return : NULL;
+
+	stat_argc(2, 2);
+
+	uint8_t*	str  = ARGV[0];
+	uint8_t*	expr = ARGV[1];
+
+	RESULT_TYPE	= INT;
+	
+	regex_t	recc;
+	size_t  nmatch = 1;
+	size_t  pmatch[1];
+
+	pcre2_regcomp(&recc, expr, 0);
+
+	if (pcre2_regexec(&recc, str, nmatch, pmatch, 0))
+		INT_RES = 0;
+	else {
+		INT_RES = OFSINIT = pmatch[0].rm_so;
+		OFSLEN  = pmatch[0].rm_eo - OFSINIT;
+
+		sprint_default_vars(Rlength);
+		sprint_default_vars(Rstart);
+	}
+
+	JUMP_BACK();
+}
+
+static void awk_split(void) {
+	setjmp(BUF_split) == 0 ? return : NULL;
+	
+	stat_argc(2, 3);
+
+	uint8_t*	str = ARGV[0];
+	uint8_t*	arr = ARGV[1];
 
 
-
+}
 
 
 
