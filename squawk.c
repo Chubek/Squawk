@@ -470,11 +470,6 @@ static void sprint_default_vars(dflvar_t var) {
 			RS	= (uint8_t*)GC_MALLOC(sizeof(int) + 1);
 			memmove(&RS[0], (void*)&RECORD_DELIM, sizeof(int));
 			break;
-		case Fs:
-			FS  	= NULL;
-			FS	= (uint8_t*)GC_MALLOC(sizeof(int) + 1);
-			memmove(&FS[0], (void*)&FIELDS_DELIM, sizeof(int));
-			break;
 		default:
 			break;
 
@@ -494,28 +489,36 @@ static void wrap_input(void) {
 }
 
 static inline void tokenize_record(void) {
-	FILE* 	 temp_stream = fmemopen((void*)RECORD, RECORD_LEN, "r");
-	int   	 temp_res;
-	size_t	 temp_len;
-	uint8_t* temp_str;
-	while ((temp_res = getdelim_wrap(
-			&temp_str, 
-			&temp_len, 
-			FIELDS_DELIM, 
-			temp_stream) > 0)) {
+	regex_t		recc;
+	size_t		nmatch = 1;
+	regmatch_t	pmatch[1];
+	regoff_t	init;
+	regoff_t	len;
+
+	pcre2_regcomp(&recc, FS, REG_NEWLINE);
+	FIELDS = NULL;
+	FIELDS = (uint8_t**)GC_MALLOC(sizeof(uint8_t*));
+	FIELDS_NUM = 1;
+
+	for (int i = 0; ; i++) {
+		if (pcre2_regexec(&recc, RECORD, nmatch, pmatch, 0))
+			break;
+
+		init = pmatch[0].rm_so;
+		len  = pmatch[0].rm_eo - init;
+		
 		FIELDS = 
 		   (uint8_t**)GC_REALLOC(FIELDS, ++FIELDS_NUM * sizeof(uint8_t*));
-		FIELDS[FIELDS_NUM - 1] = (uint8_t*)GC_MALLOC(temp_len);
-		u8_strncpy(
-			&FIELDS[FIELDS_NUM - 1][0], 
-			&temp_str[0], 
-			temp_len);
-		sprint_default_vars(Nf);
-		free(temp_str);
-		continue;
-	} 
+		   FIELDS[FIELDS_NUM - 2] = (uint8_t*)GC_MALLOC(len);
+		   u8_strncat(
+				&FIELDS[FIELDS_NUM - 2][0],
+				&RECORD[init],
+				len
+			   );
+	}
 	
-	fclose(temp_stream);
+	sprint_default_vars(Nf);
+
 }
 
 static inline void read_record(void) {
