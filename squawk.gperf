@@ -1,0 +1,254 @@
+%{
+#include <stdio.h>
+#include <string.h>
+#include <math.h>
+#include <stdlib.h>
+#include <setjmp.h>
+
+#define NUM_BUILTIN 20
+
+#include <pcre2posix.h>
+#include <gc.h>
+
+static jmp_buf JUMP_BUFFERS[NUM_BUILTIN];
+
+#define BUF_atan2 	0
+#define BUF_cos 	1
+#define BUF_sin 	2
+#define BUF_exp 	3
+#define BUF_log 	4
+#define BUF_sqrt 	5
+#define BUF_int 	6
+#define BUF_rand	7
+#define BUF_srand 	8
+#define BUF_gsub 	9
+#define BUF_index 	10
+#define BUF_length 	11
+#define BUF_match 	12
+#define BUF_split 	13
+#define BUF_sprintf 	14
+#define BUF_sub 	15
+#define BUF_substr 	16
+#define BUF_tolower 	17
+#define BUF_toupper 	18
+#define BUF_default	19
+
+static uin8t_t** ARGV;
+static int	 ARGC;
+static long double	 FLOAT_RES;
+static int64_t	 	 INT_RES;
+static uint8_t*		 STR_RES;
+
+typedef enum ResultType { FLOAT, INT, STR, NOTHING } restype_t;
+
+static restype_t	RESULT_TYPE;
+
+static inline void stat_argc(int num_min, int num_max) {
+	if (ARGC < num_min || ARGC > num_max) {
+		fprintf(stderr, "Wrong number of arguments passed\n");
+		exit(EXIT_FAILURE);
+	}
+}
+
+#define JUMP_BACK() 	longjmp(BUF_default, 1)
+%}
+%struct-type
+%switch-num=8
+%define hash-function-name AWK_BUILTIN_LUT
+
+struct AwkBuiltin { char* name; int jmp_id; }
+%%
+atan2, 0
+cos, 1
+sin, 2
+exp, 3
+log, 4
+sqrt, 5
+int, 6
+rand, 7
+srand, 8
+gsub, 9
+index, 10
+length, 11
+match, 12
+split, 13
+sprintf, 14
+sub, 15
+substr, 16
+tolower, 17
+toupper, 18
+%%
+static void atan2(void) {
+	setjmp(BUF_atan2);
+
+	stat_argc(2, 2);
+	long double f1 = strtold(ARGV[0], NULL);
+	long double f2 = strtold(ARGV[1], NULL);
+	
+	RESULT_TYPE    = FLOAT;
+	FLOAT_RES      = atan2l(f1, f2);
+
+	JUMP_BACK();
+}
+
+static void cos(void) {
+	setjmp(BUF_cos);
+
+	stat_argc(1, 1);
+	long double f   = strtold(ARGV[0], NULL);
+
+	RESULT_TYPE	= FLOAT;
+	FLOAT_RES	= cosl(f);
+
+	JUMP_BACK();
+}
+
+static void sin(void) {
+	setjmp(BUF_sin);
+		
+	stat_argc(1, 1);
+	long double f   = strtold(ARGV[0], NULL);
+
+	RESULT_TYPE	= FLOAT;
+	FLOAT_RES	= sinl(f);
+
+	JUMP_BACK();
+}
+
+static void exp(void) {
+	setjmp(BUF_exp);
+
+	stat_argc(1, 1);
+	long double f   = strtold(ARGV[0], NULL);
+
+	RESULT_TYPE	= FLOAT;
+	FLOAT_RES	= expl(f);
+
+	JUMP_BACK();
+}
+
+static void exp(void) {
+	setjmp(BUF_log);
+
+	stat_argc(1, 1);
+	long double f   = strtold(ARGV[0], NULL);
+
+	RESULT_TYPE	= FLOAT;
+	FLOAT_RES	= logl(f);
+
+	JUMP_BACK();
+}
+
+static void sqrt(void) {
+	setjmp(BUF_sqrt);
+
+	stat_argc(1, 1);
+	long double f   = strtold(ARGV[0], NULL);
+
+	RESULT_TYPE	= FLOAT;
+	FLOAT_RES	= sqrtl(f);
+
+	JUMP_BACK();
+}
+
+static void toint(void) {
+	setjmp(BUF_int);
+
+	stat_argc(1, 1);
+	long double f   = strtold(ARGV[0], NULL);
+
+	RESULT_TYPE	= INT;
+	INT_RES		= lrintl(f);
+
+	JUMP_BACK();
+}
+
+static void rand(void) {
+	setjmp(BUF_rand);
+
+	stat_argc(0, 0);
+
+	RESULT_TYPE	= INT;
+	INT_RES		= rand();
+
+	JUMP_BACK();
+}
+
+static void srand(void) {
+	setjmp(BUF_rand);
+
+	stat_argc(0, 1);
+	int64_t seed = ARGV[0] ? strtoll(ARGV[0], NULL, 10) : 0;
+
+	RESULT_TYPE	= INT;
+	INT_RES		= srand(seed);
+
+	JUMP_BACK();
+}
+
+static void gsub(void) {
+	setjmp(BUF_gsub);
+
+	stat_argc(2, 3);
+	uint8_t* expr    = ARGV[0];
+	uint8_t* repl    = ARGV[1];
+	uint8_t* inid    = ARGV[2];
+
+	
+	uint8_t* inword;
+	
+	if (inid) {
+		uintptr_t value;
+		symtype_t symbol_type = sym_get(inid, &value);
+		if (symbol_type == STRING) {
+			inword = (uint8_t*)value;
+		}
+	} else {
+		inword = RECORD;
+	}
+
+	size_t len	 = u8_strlen(inword) + 1;
+	size_t replen    = u8_strlen(repl);
+	RESULT_TYPE	 = STR;
+	STR_RES		 =
+		(uint8_t*)GC_MALLOC(len);
+
+	u8_strncpy(&STR_RES[0], &inword[0], len);
+
+	regex_t 	recc;
+	size_t  	nmatch = 1;
+	regmatch_t	pmatch[1];
+	regoff_t	match_init;
+	regoff_t	match_len;
+
+	pcre2_regcomp(&recc, expr, 0);
+	
+	while (int i; ; i++) {
+		if (pcre2_regexec(&regcc, inword, nmatch, pmatch, 0))
+			break;
+		
+		len += replen;
+		STR_RES = (uint8_t*)GC_REALLOC(STR_RES, len);
+
+		
+		match_init = pmatch[0].rm_so;
+		match_len  = pmatch[0].rm_eo - match_init;
+		u8_strncpy(&STR_RES[match_init], &repl[0], match_len);
+
+	}
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+
