@@ -492,7 +492,7 @@ static inline void tokenize_record(void) {
 	regex_t		recc;
 	size_t		nmatch = 1;
 	regmatch_t	pmatch[1];
-	regoff_t	init;
+	regoff_t	init = 0;
 	regoff_t	len;
 
 	pcre2_regcomp(&recc, FS, REG_NEWLINE);
@@ -501,7 +501,7 @@ static inline void tokenize_record(void) {
 	FIELDS_NUM = 1;
 
 	for (int i = 0; ; i++) {
-		if (pcre2_regexec(&recc, RECORD, nmatch, pmatch, 0))
+		if (pcre2_regexec(&recc, &RECORD[init], nmatch, pmatch, 0))
 			break;
 
 		init = pmatch[0].rm_so;
