@@ -142,8 +142,7 @@ if (st != NONE) {
 	sym_put(s1, (uintptr_t)IOSTREAM, IO_STREAM);
 }
 while (--ARGC) {
-	IOTEXT = ARGV[ARGC];
-	stream_write();
+	puts(ARGV[ARGC]);
 }
 
 shellout ( s1 s2 -- s3 )
@@ -221,6 +220,16 @@ if (!s2) {
 	sym_put(s2, (uintptr_t)(*IORESULT), STRING);
 }
 
+printnoredir ( )
+while (--ARGC) {
+	puts(ARGV[ARGC]);
+}
+
+printfmtnodir (  )
+uint8_t*	fmt = ARGV[0];
+print_formatted(stdout, fmt, &ARGV[1]);
+
+
 lit ( #i -- i )
 
 drop ( i -- )
@@ -270,7 +279,6 @@ if (i1 <= i2) {
   SET_IP(target);
   INST_TAIL;
 }
-
 
 call ( #target #iadjust -- targetret aoldfp )
 targetret = IP;
