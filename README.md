@@ -18,6 +18,8 @@ If you wish to generate `squawk.gperf` which is the LUT for builtin functions, y
 
 Pretty soon VMGEN will be added to the mix.
 
+**UPDATE**: Most VMGEN functions written, note that GPerf and VMGEN specs have not been thoroughly inspected and debugged! But as far as I am concerned, `squawk.c` should build? Depends on your machine.
+
 Plan on using Re2C for lexing and Yacc for parsing.
 
 Please lemme know about any ideas that you have for Squawk:
