@@ -1,0 +1,295 @@
+\ stack definitions:
+\E stack data-stack sp Cell
+
+\ stack prefix definitions
+\E inst-stream stack-prefix #
+
+\ type prefix definitions:
+\E s" long long"  single data-stack type-prefix i
+\E s" unsigned long long" single data-stack type-prefix u
+\E s" long double" single data-stack type-prefix f
+\E s" unsigned char *" single data-stack type-prefix s
+\E s" unsigned char **" single data-stack type-prefix p
+\E s" void *" single data-stack type-prefix v
+\E s" Inst *" single data-stack type-prefix target
+\E s" void **" single data-stack type-prefix j
+
+\ literal C code
+\C static jmp_buf curr_jmpbuff;
+
+
+\ VM instructions
+iadd ( i1 i2 -- i )
+i = i1+i2;
+
+isub ( i1 i2 -- i )
+i = i1-i2;
+
+imul ( i1 i2 -- i )
+i = i1*i2;
+
+idiv ( i1 i2 -- i )
+i = i1/i2;
+
+imod ( i1 i2 -- i )
+i = i1%i2;
+
+ipow ( i1 i2 -- i )
+i = powl((long double)i1, (long double)i2);
+
+iexp ( i1 i2 -- i )
+i = expl((long double)i1, (long double)i2);
+
+fadd ( f1 f2 -- f )
+f = f1+f2;
+
+fsub ( f1 f2 -- f )
+f = f1-f2;
+
+fmul ( f1 f2 -- f )
+f = f1*f2;
+
+fdiv ( f1 f2 -- f )
+f = f1/f2;
+
+fmod ( f1 f2 -- f )
+f = fmodl(f1, f2);
+
+fpow ( f1 f2 -- f )
+f = fpowl(f1, f2);
+
+fexp ( f1 f2 -- f )
+f = expl(f1, f2);
+
+and ( i1 i2 -- i )
+i = i1 & i2;
+
+or ( i1 i2 -- i )
+i = i1 | i2;
+
+xor ( i1 i2 -- i )
+i = i1 ^ i2;
+
+shr ( i1 i2 -- i )
+i = i1 >> i2;
+
+shl ( i1 i2 -- i )
+i = i1 << i2;
+
+logicaland ( i1 i2 -- i )
+i = i1 && i2;
+
+logicalor ( i1 i2 -- i )
+i = i1 || i2;
+
+ilessthan ( i1 i2 -- i )
+i = i1<i2;
+
+igreaterthan ( i1 i2 -- i )
+i = i1>i2;
+
+ilessthaneq ( i1 i2 -- i )
+i = i1 <= i2;
+
+igreaterthaneq ( i1 i2 -- i )
+i = i1 >= i2;
+
+iequals ( i1 i2 -- i )
+i = i1==i2;
+
+flessthan ( f1 f2 -- f )
+f = f1<f2;
+
+fgreaterthan ( f1 f2 -- f )
+f = f1>f2;
+
+flessthaneq ( f1 f2 -- f )
+f = f1 <= f2;
+
+fgreaterthaneq ( f1 f2 -- f )
+f = f1 >= f2;
+
+fequals ( f1 f2 -- f )
+f = f1==f2;
+
+not ( i1 -- i2 )
+i2 = !i1;
+
+negate ( i1 -- i2 )
+i2 = -i1;
+
+
+builtincall ( s1 s2 -- )
+curr_jmpbuff = JUMP_BUFFERS[(int[2])AWK_BUILTIN_LUT(s)[1]];
+longjmp(curr_jmpbuff);
+
+printoutwrite ( s1 -- )
+uintptr_t value;
+symtype_t st  = sym_get(s1, &value);
+if (st != NONE) {
+	if (st == PIPE_STREAM) {
+		fprintf(stderr, "Error: Expression needs to be piped\n");
+		exit(EX_IOERR);
+	} else if (st == IO_STREAM) {
+		IOTEXT = (FILE*)value;
+	} else {
+		fprintf(stderr, "Error: Symbol collision\n");
+		exit(EXIT_FAILURE);
+	}
+} else {
+	IOTEXT = s1; IORWMODE = s2;
+	file_open();
+	sym_put(s1, (uintptr_t)IOSTREAM, IO_STREAM);
+}
+while (--ARGC) {
+	IOTEXT = ARGV[ARGC];
+	stream_write();
+}
+
+shellout ( s1 s2 -- s3 )
+uintptr_t value;
+symtype_t st = sym_get(s1, &value);
+if (st != NONE) {
+	if (st == IO_STREAM) {
+		fprintf(stderr, "Error: Expression needs to be shell\n");
+		exit(EX_IOERR);
+	} else if (st == PIPE_STREAM) {
+		IOTEXT = (FILE*)value;
+	}
+} else {
+	IOTEXT 		= s1;
+	IORWMODE	= s2;
+	flush_stdio();
+	pipe_open();
+}
+stream_read();
+write_iores();
+
+printfmt ( s1 s2 -- )
+uintptr_t value;
+symtype_t st  = sym_get(s1, &value);
+if (st != NONE) {
+	if (st == PIPE_STREAM) {
+		fprintf(stderr, "Error: Expression needs to be piped\n");
+		exit(EX_IOERR);
+	} else if (st == IO_STREAM) {
+		IOSTREAM = (FILE*)value;
+	} else {
+		fprintf(stderr, "Error: Symbol collision\n");
+		exit(EXIT_FAILURE);
+	}
+} else {
+	IOTEXT = s1; IORWMODE = s2;
+	file_open();
+	sym_put(s1, (uintptr_t)IOSTREAM, IO_STREAM);
+}
+uint8_t* fmt = ARGV[0];
+print_formatted(IOSTREAM, fmt, &ARGV[1]);
+
+getlinesimple ( )
+read_record();
+
+getlinevar ( s -- )
+uint8_t* 	record_swap = RECORD;
+uint8_t*	record_repl;
+RECORD  = record_repl;
+read_record();
+sym_put(s, record_repl);
+record_repl = NULL;
+RECORD = record_swap;
+
+getlinefile ( s1 s2 -- )
+value_t value;
+symtype_t 	st = sym_get(s1, &value);
+if (st != NONE) {
+	if (st == PIPE_STREAM) {
+		fprintf(stderr, "Error: expression needs to be piped");
+		exit(EX_IOERR);
+	} else if (st == IO_STREAM) {
+		IOSTREAM = (FILE*)stream;
+	}
+} else {
+	IOTEXT = s1; IORWMODE = "w";
+	file_open();
+	sym_put(s1, (uintptr_t)IOSTREAM, IO_STREAM);
+}
+stream_read();
+if (!s2) {
+	RECORD = NULL;
+	u8_strncpy(&RECORD[0], *IORESULT, *IORESLEN);
+} else {
+	sym_put(s2, (uintptr_t)(*IORESULT), STRING);
+}
+
+lit ( #i -- i )
+
+drop ( i -- )
+
+
+branch ( #target -- )
+SET_IP(target);
+
+zbranch ( #target i -- )
+if (i==0) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+branchifeq ( #target i1 i2 -- )
+if (i1 == i2) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+branchifne ( #target i1 i2 -- )
+if (i1 != i2) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+branchifgt ( #target i1 i2 -- )
+if (i1 > i2) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+branchiflt ( #target i1 i2 -- )
+if (i1 < i2) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+branchifge ( #target i1 i2 -- )
+if (i1 >= i2) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+branchifle ( #target i1 i2 -- )
+if (i1 <= i2) {
+  SET_IP(target);
+  INST_TAIL;
+}
+
+
+call ( #target #iadjust -- targetret aoldfp )
+targetret = IP;
+SET_IP(target);
+aoldfp = fp;
+sp = (Cell *)(((char *)sp)+iadjust);
+fp = (char *)sp;
+
+return ( #iadjust target afp i1 -- i2 )
+SET_IP(target);
+sp = (Cell *)(((char *)sp)+iadjust);
+fp = afp;
+i2=i1;
+
+loadlocal ( #ioffset -- i )
+vm_Cell2i(*(Cell *)(fp+ioffset),i);
+
+storelocal ( #ioffset i -- )
+vm_i2Cell(i,*(Cell *)(fp+ioffset));
+
+ll = loadlocal lit
+
