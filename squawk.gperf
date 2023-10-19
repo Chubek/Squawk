@@ -6,7 +6,7 @@
 #include <setjmp.h>
 
 #define NUM_BUILTIN		 20
-#define MAX_SPRINTF_ARGV	 2048
+#define MAX_SPRINTF_PARGV	 2048
 
 #include <pcre2posix.h>
 #include <gc.h>
@@ -34,8 +34,6 @@ static jmp_buf JUMP_BUFFERS[NUM_BUILTIN];
 #define BUF_toupper 	18
 #define BUF_default	19
 
-static uin8t_t** ARGV;
-static int	 ARGC;
 static long double	 FLOAT_RES;
 static int64_t	 	 INT_RES;
 static uint8_t*		 STR_RES;
@@ -82,8 +80,8 @@ static void awk_atan2(void) {
 	setjmp(BUF_atan2) == 0 ? return : NULL;
 
 	stat_argc(2, 2);
-	long double f1 = strtold(ARGV[0], NULL);
-	long double f2 = strtold(ARGV[1], NULL);
+	long double f1 = strtold(PARGV[0], NULL);
+	long double f2 = strtold(PARGV[1], NULL);
 	
 	RESULT_TYPE    = FLOAT;
 	FLOAT_RES      = atan2l(f1, f2);
@@ -95,7 +93,7 @@ static void awk_cos(void) {
 	setjmp(BUF_cos) == 0  ? return : NULL;
 
 	stat_argc(1, 1);
-	long double f   = strtold(ARGV[0], NULL);
+	long double f   = strtold(PARGV[0], NULL);
 
 	RESULT_TYPE	= FLOAT;
 	FLOAT_RES	= cosl(f);
@@ -107,7 +105,7 @@ static void awk_sin(void) {
 	setjmp(BUF_sin) == 0  ? return : NULL;
 		
 	stat_argc(1, 1);
-	long double f   = strtold(ARGV[0], NULL);
+	long double f   = strtold(PARGV[0], NULL);
 
 	RESULT_TYPE	= FLOAT;
 	FLOAT_RES	= sinl(f);
@@ -119,7 +117,7 @@ static void awk_exp(void) {
 	setjmp(BUF_exp) == 0  ? return : NULL;
 
 	stat_argc(1, 1);
-	long double f   = strtold(ARGV[0], NULL);
+	long double f   = strtold(PARGV[0], NULL);
 
 	RESULT_TYPE	= FLOAT;
 	FLOAT_RES	= expl(f);
@@ -131,7 +129,7 @@ static void awk_exp(void) {
 	setjmp(BUF_log) == 0   ? return : NULL;
 
 	stat_argc(1, 1);
-	long double f   = strtold(ARGV[0], NULL);
+	long double f   = strtold(PARGV[0], NULL);
 
 	RESULT_TYPE	= FLOAT;
 	FLOAT_RES	= logl(f);
@@ -143,7 +141,7 @@ static void awk_sqrt(void) {
 	setjmp(BUF_sqrt) == 0  ? return : NULL;
 
 	stat_argc(1, 1);
-	long double f   = strtold(ARGV[0], NULL);
+	long double f   = strtold(PARGV[0], NULL);
 
 	RESULT_TYPE	= FLOAT;
 	FLOAT_RES	= sqrtl(f);
@@ -155,7 +153,7 @@ static void awk_int(void) {
 	setjmp(BUF_int) == 0 ? return : NULL;
 
 	stat_argc(1, 1);
-	long double f   = strtold(ARGV[0], NULL);
+	long double f   = strtold(PARGV[0], NULL);
 
 	RESULT_TYPE	= INT;
 	INT_RES		= lrintl(f);
@@ -178,7 +176,7 @@ static void awk_srand(void) {
 	setjmp(BUF_rand) == 0 ? return : NULL;
 
 	stat_argc(0, 1);
-	int64_t seed = ARGV[0] ? strtoll(ARGV[0], NULL, 10) : 0;
+	int64_t seed = PARGV[0] ? strtoll(PARGV[0], NULL, 10) : 0;
 
 	RESULT_TYPE	= INT;
 	INT_RES		= srand(seed);
@@ -190,9 +188,9 @@ static void awk_gsub(void) {
 	setjmp(BUF_gsub) == 0 ? return : NULL;
 
 	stat_argc(2, 3);
-	uint8_t* expr    = ARGV[0];
-	uint8_t* repl    = ARGV[1];
-	uint8_t* inid    = ARGV[2];
+	uint8_t* expr    = PARGV[0];
+	uint8_t* repl    = PARGV[1];
+	uint8_t* inid    = PARGV[2];
 
 	
 	uint8_t* inword;
@@ -246,8 +244,8 @@ static void awk_index(void) {
 
 	stat_argc(2, 2);
 
-	uint8_t*	s1 = ARGV[0];
-	uint8_t*	s2 = ARGV[1];
+	uint8_t*	s1 = PARGV[0];
+	uint8_t*	s2 = PARGV[1];
 
 	RESULT_TYPE 	= INT;
 	INT_RES		= ((size_t)strstr(s1, s2) - (size_t)s1) + 1;
@@ -264,7 +262,7 @@ static void awk_length(void) {
 
 	stat_argc(0, 1);
 
-	uint8_t* 	s = ARGV[0] ? ARGV[0] : RECORD;
+	uint8_t* 	s = PARGV[0] ? PARGV[0] : RECORD;
 
 	RESULT_TYPE	  = INT;
 	INT_RES		  = u8_strlen(s);
@@ -277,8 +275,8 @@ static void awk_match(void) {
 
 	stat_argc(2, 2);
 
-	uint8_t*	str  = ARGV[0];
-	uint8_t*	expr = ARGV[1];
+	uint8_t*	str  = PARGV[0];
+	uint8_t*	expr = PARGV[1];
 
 	RESULT_TYPE	= INT;
 	
@@ -308,9 +306,9 @@ static void awk_split(void) {
 
 	RESULT_TYPE = INT;
 
-	uint8_t*	str   = ARGV[0];
-	uint8_t*	arr   = ARGV[1];
-	uint8_t*	tok   = ARGV[2] ? ARGV[2] : FS;
+	uint8_t*	str   = PARGV[0];
+	uint8_t*	arr   = PARGV[1];
+	uint8_t*	tok   = PARGV[2] ? PARGV[2] : FS;
 
 	regex_t 	recc;
 	size_t		nmatch;
@@ -348,9 +346,9 @@ static void awk_split(void) {
 static void awk_sprintf(void) {
 	setjmp(BUF_sprintf) == 0 ? return : NULL;
 
-	stat_argc(1, MAX_SPRINTF_ARGV);
+	stat_argc(1, MAX_SPRINTF_PARGV);
 	
-	uint8_t*	fmt = ARGV[0];
+	uint8_t*	fmt = PARGV[0];
 
 	size_t		len = u8_strlen(fmt);
 	uint8_t*	str = (uint8_t*)GC_MALLOC(len);
@@ -358,7 +356,7 @@ static void awk_sprintf(void) {
 					(void*)str, 
 					len,
 					"w+");
-	len = print_formatted(stream, fmt, &ARGV[2]);
+	len = print_formatted(stream, fmt, &PARGV[2]);
 
 	RESULT_TYPE = STR;
 	fgets(&STR_RES[0], len, stream);
