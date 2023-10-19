@@ -43,10 +43,17 @@ typedef enum ResultType { FLOAT, INT, STR, NOTHING } restype_t;
 static restype_t	RESULT_TYPE;
 
 static inline void stat_argc(int num_min, int num_max) {
-	if (ARGC < num_min || ARGC > num_max) {
+	if (PARGC < num_min || PARGC > num_max) {
 		fprintf(stderr, "Wrong number of arguments passed\n");
 		exit(EXIT_FAILURE);
 	}
+}
+
+static inline void add_pargv(uint8_t* arg) { PARGV[PARGC++] = arg; }
+
+static inline void clear_pargv(void) {
+	PARGV = NULL;
+	PARGC = 0;
 }
 
 #define JUMP_BACK() 	longjmp(BUF_default, 1)
