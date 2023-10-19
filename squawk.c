@@ -104,6 +104,8 @@ typedef struct Squawk {
 	FILE*		iostream;
 	int 		ioint;
 	bool		ioispipe;
+	uint8_t**	pargv;
+	int		pargc;
 } squawk_t;
 
 typedef enum DefaultVar { 
@@ -171,6 +173,8 @@ static squawk_t* 	sq_state;
 #define IOINT		sq_state->ioint
 #define IOISPIPE	sq_state->ioispipe
 #define IORWMODE	sq_state->iorwmode
+#define PARGV		sq_state->pargv
+#define PARGC		sq_state->pargc
 
 void do_on_exit(void) {
 	fclose(OUTPUT);
@@ -577,6 +581,14 @@ static inline void file_scan(void) {
 		}
 	}
 	wrap_input();
+}
+
+static inline void flush_stdio(void) {
+	fflush(stdin); fflush(stdout); fflush(stderr);
+}
+
+static inline void write_iores(void) {
+	fputs(*IORESULT, stdout);
 }
 
 static inline void stream_read(void) {
