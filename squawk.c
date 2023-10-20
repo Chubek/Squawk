@@ -244,7 +244,7 @@ static void put_default_vars(void) {
 		id   = default_vars[i + 1];
 		val  = default_vars[i];
 
-		sym_put(id, (uintptr_t)val, STRING);
+		sym_str_put(id, val);
 	}
 
 }
@@ -377,6 +377,47 @@ static void  sym_remove(uint8_t *id) {
 	}
 
 }
+
+static inline void sym_int_put(uint8_t* id, int64_t integer) {
+	sym_put(id, (uintptr_t)integer, INT);
+}
+
+static inline int64_t sym_int_get(uint8_t* id) {
+	uintptr_t 	value;
+	symtype_t 	symbol_type = sym_get(id, &value);
+	if (symbol_type != INT)
+		return -1;
+	else
+		return (int64_t)value;
+}
+
+static inline void sym_flt_put(uint8_t* id, long double flt) {
+	sym_put(id, (uintptr_t)flt, FLOAT);
+}
+
+static inline long double sym_flt_get(uint8_t* id) {
+	uintptr_t 	value;
+	symtype_t 	symbol_type = sym_get(id, &value);
+	if (symbol_type != FLOAT)
+		return -1;
+	else
+		return (long double)value;
+}
+
+static inline void sym_str_put(uint8_t* id, uint8_t* string) {
+	sym_put(id, (uintptr_t)string, STRING);
+}
+
+static inline int64_t sym_int_get(uint8_t* id) {
+	uintptr_t 	value;
+	symtype_t 	symbol_type = sym_get(id, &value);
+	if (symbol_type != STRING)
+		return -1;
+	else
+		return (uint8_t*)value;
+}
+
+
 
 static inline void sym_func_put(
 		uint8_t* id, 
