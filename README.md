@@ -20,6 +20,8 @@ Pretty soon VMGEN will be added to the mix.
 
 **UPDATE**: Most VMGEN functions written, note that GPerf and VMGEN specs have not been thoroughly inspected and debugged! But as far as I am concerned, `squawk.c` should build? Depends on your machine.
 
+**UPDATE 2**: VMGEN generates the stack machine with no issues.
+
 Plan on using Re2C for lexing and Yacc for parsing.
 
 Please lemme know about any ideas that you have for Squawk:
