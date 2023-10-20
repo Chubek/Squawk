@@ -399,7 +399,7 @@ static inline long double sym_flt_get(uint8_t* id) {
 	uintptr_t 	value;
 	symtype_t 	symbol_type = sym_get(id, &value);
 	if (symbol_type != FLOAT)
-		return -1;
+		return -1.0;
 	else
 		return (long double)value;
 }
@@ -408,11 +408,11 @@ static inline void sym_str_put(uint8_t* id, uint8_t* string) {
 	sym_put(id, (uintptr_t)string, STRING);
 }
 
-static inline int64_t sym_int_get(uint8_t* id) {
+static inline uint8_t* sym_str_get(uint8_t* id) {
 	uintptr_t 	value;
 	symtype_t 	symbol_type = sym_get(id, &value);
 	if (symbol_type != STRING)
-		return -1;
+		return NULL;
 	else
 		return (uint8_t*)value;
 }
