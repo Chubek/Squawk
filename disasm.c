@@ -19,7 +19,7 @@
   along with this program; if not, see http://www.gnu.org/licenses/.
 */
 
-#include "squawk.h"
+#include "machine.h"
 
 #define IP (ip+1)
 #define IPTOS IP[0]
