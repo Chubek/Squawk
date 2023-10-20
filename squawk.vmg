@@ -13,6 +13,7 @@
 \E s" void *" single data-stack type-prefix v
 \E s" Inst *" single data-stack type-prefix target
 \E s" void **" single data-stack type-prefix j
+\E s" char *" single data-stack type-prefix a
 
 \ literal C code
 \C static jmp_buf curr_jmpbuff;
@@ -185,7 +186,7 @@ if (st != NONE) {
 uint8_t* fmt = ARGV[0];
 print_formatted(IOSTREAM, fmt, &ARGV[1]);
 
-getlinesimple ( )
+getlinesimple ( i -- )
 read_record();
 
 getlinevar ( s -- )
@@ -220,20 +221,18 @@ if (!s2) {
 	sym_put(s2, (uintptr_t)(*IORESULT), STRING);
 }
 
-printnoredir ( )
+printnoredir ( i -- )
 while (--ARGC) {
 	puts(ARGV[ARGC]);
 }
 
-printfmtnodir (  )
+printfmtnodir ( i -- )
 uint8_t*	fmt = ARGV[0];
 print_formatted(stdout, fmt, &ARGV[1]);
-
 
 lit ( #i -- i )
 
 drop ( i -- )
-
 
 branch ( #target -- )
 SET_IP(target);
