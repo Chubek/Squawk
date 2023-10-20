@@ -24,6 +24,12 @@ typedef enum Symtype {
 		NONE, IORES, PIPE_STREAM, IO_STREAM,
 } symtype_t;
 
+typedef struct Function {
+	uint8_t*	id;
+	Inst*		start;
+	int		nparams;
+} func_t;
+
 typedef enum BlockState {
 	BEGIN_BLK, END_BLK, EXPR_BLK, PATT_BLK, NOEXPR_BLK,
 } blstat_t;
@@ -370,6 +376,30 @@ static void  sym_remove(uint8_t *id) {
 		SYMTBL_CNT--;
 	}
 
+}
+
+static inline void sym_func_put(
+		uint8_t* id, 
+		Inst* start, 
+		int nparams) {
+	func_t*	fn = (func_t*)GC_MALLOC(sizeof(func_t));
+	fn->id 		= id;
+	fn->start	= start;
+	fn->nparams	= nparams;
+	sym_put(id, (uintptr_t)fn, FUNCTION);
+}
+
+static inline int sym_func_get(uint8_t* id, Inst** start) {
+	uintptr_t 	value;
+	symtype_t  	symbol_type = sym_get(id, &value);
+	if (symbol_type != FUNCTION) {
+		fprintf(stderr, "Error: Identifier does not belong to function\n");
+		exit(EXIT_FAILURE);
+	}
+
+	func_t*		fn = (func_t*)value;
+	*start		   = fn->start;
+	return fn->nparams;
 }
 
 static inline void sym_array_put(uint8_t* id, 
