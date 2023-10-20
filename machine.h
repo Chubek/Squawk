@@ -4,12 +4,18 @@ typedef void* Label;
 typedef long* Label;
 #endif
 
+typedef union Cell cell_t;
 typedef union Cell {
-	long 			i;
+	long long		i;
 	cell_t*			target;
 	Label			inst;
 	char*			a;
 	unsigned char*		s;
+	void*			v;
+	unsigned char**		p;
+	void**			j;
+	unsigned long long	u;
+	unsigned double		f;
 } Cell, Inst;
 
 #define vm_Cell2i(_cell,_x)     	((_x)=(_cell).i)
