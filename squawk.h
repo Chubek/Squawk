@@ -10,6 +10,7 @@ typedef struct Slhtbl		 slhtbl_t;
 typedef enum   DefaultVar	 dflvar_t;
 typedef enum   Symtype		 symtype_t;
 typedef union  Cell		 Inst, Cell;
+typedef enum   BlockState	 blstat_t;
 
 int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
 				const uint8_t* command, 
@@ -97,12 +98,26 @@ static inline void iores_get(void);
 
 static inline void iores_put(void);
 
-static inline uint64_t sym_func_get(uint8_t* id, Inst** start);
-static inline void sym_func_put(
-		uint8_t* 	id, 
-		Inst* 		start, 
-		int 		nparams,
-		int 		nonparams);
+static inline int sym_func_get(
+		uint8_t* id, 
+		Inst** start, 
+		Inst** end);
+static inline int sym_func_end(uint8_t* id, Inst* end);
+static inline void sym_func_start(
+			uint8_t* 	id,
+			Inst*		start,
+			int		nparams);
+
+static inline int sym_block_get(
+		uint8_t* id, 
+		Inst** start, 
+		Inst** end);
+static inline int sym_block_end(uint8_t* id, Inst* end);
+static inline void sym_block_start(
+			uint8_t* 	id,
+			blstat_t	stat,
+			uint8_t*	hitch,
+			Inst*		start);
 
 static inline long double sym_flt_get(uint8_t* id);
 static inline void sym_flt_put(uint8_t* id, long double flt);
