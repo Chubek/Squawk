@@ -11,13 +11,13 @@
 #include "escape-map.h"
 #include "yy.tab.h"
 
-static inline uint8_t* gc_strndup(uint8_t* str, size_t len) {
+uint8_t* gc_strndup(uint8_t* str, size_t len) {
 	uint8_t* nstr = (uint8_t*)GC_MALLOC(len + 1);
 	u8_strncat(nstr, str, len);
 	return nstr;
 }
 
-static inline uint8_t* gc_strncat(uint8_t* str, uint8_t* cat, size_t len) {
+uint8_t* gc_strncat(uint8_t* str, uint8_t* cat, size_t len) {
 	str = (uint8_t*)GC_REALLOC(u8_strlen(str) + len);
 	u8_strncat(&str[0], &cat[0], len);
 	return str;
