@@ -9,7 +9,7 @@ typedef struct Squawk		 squawk_t;
 typedef struct Slhtbl		 slhtbl_t;
 typedef enum   DefaultVar	 dflvar_t;
 typedef enum   Symtype		 symtype_t;
-typedef struct Cell		 Inst;
+typedef union  Cell		 Inst, Cell;
 
 int execute_and_rw(uint8_t* id_stream, uint8_t *id_var, 
 				const uint8_t* command, 
@@ -97,11 +97,12 @@ static inline void iores_get(void);
 
 static inline void iores_put(void);
 
-static inline int sym_func_get(uint8_t* id, Inst** start);
+static inline uint64_t sym_func_get(uint8_t* id, Inst** start);
 static inline void sym_func_put(
-		uint8_t* id, 
-		Inst* start, 
-		int nparams);
+		uint8_t* 	id, 
+		Inst* 		start, 
+		int 		nparams,
+		int 		nonparams);
 
 static inline long double sym_flt_get(uint8_t* id);
 static inline void sym_flt_put(uint8_t* id, long double flt);
@@ -111,5 +112,6 @@ static inline void sym_int_put(uint8_t* id, int64_t integer);
 
 static inline uint8_t* sym_str_get(uint8_t* id);
 static inline void sym_str_put(uint8_t* id, uint8_t* string);
+
 
 #endif
