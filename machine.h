@@ -1,13 +1,20 @@
+#ifndef MACHINE_H_
+#define MACHINE_H_
+
+#include <stdio.h>
+#include <stdint.h>
+
+#include "squawk.h"
+
 #ifdef __GNUC__
 typedef void* Label;
 #else
 typedef long* Label;
 #endif
 
-typedef union Cell cell_t;
 typedef union Cell {
 	long long		i;
-	cell_t*			target;
+	Cell*			target;
 	Label			inst;
 	char*			a;
 	unsigned char*		s;
@@ -25,6 +32,9 @@ typedef union Cell {
 #define vm_Cell2a(_cell,_x)     	((_x)=(_cell).a)
 #define vm_a2Cell(_x,_cell)     	((_cell).a=(_x))        
 #define vm_Cell2Cell(_x,_y) 		((_y)=(_x))
+
+#define symfn_res2nparams(res)		(res & MAX_UINT32)
+#define symfn_res2nonparams(res)	(res & (MAX_UINT32 << UINT32_WIDTH))
 
 extern Label *vm_prim;
 extern int locals;
@@ -50,4 +60,4 @@ void vm_print_profile(FILE *file);
 long engine(Inst *ip0, Cell *sp, char *fp);
 long engine_debug(Inst *ip0, Cell *sp, char *fp);
 
-
+#endif
