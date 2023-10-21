@@ -28,6 +28,7 @@ typedef struct Function {
 	uint8_t*	id;
 	Inst*		start;
 	int		nparams;
+	int		nonparams;
 } func_t;
 
 typedef enum BlockState {
@@ -420,17 +421,19 @@ static inline uint8_t* sym_str_get(uint8_t* id) {
 
 
 static inline void sym_func_put(
-		uint8_t* id, 
-		Inst* start, 
-		int nparams) {
+		uint8_t* 	id, 
+		Inst* 		start, 
+		int 		nparams,
+		int 		nonparams) {
 	func_t*	fn = (func_t*)GC_MALLOC(sizeof(func_t));
 	fn->id 		= id;
 	fn->start	= start;
 	fn->nparams	= nparams;
+	fn->nonparams	= nonparams;
 	sym_put(id, (uintptr_t)fn, FUNCTION);
 }
 
-static inline int sym_func_get(uint8_t* id, Inst** start) {
+static inline uint64_t sym_func_get(uint8_t* id, Inst** start) {
 	uintptr_t 	value;
 	symtype_t  	symbol_type = sym_get(id, &value);
 	if (symbol_type != FUNCTION) {
@@ -440,7 +443,7 @@ static inline int sym_func_get(uint8_t* id, Inst** start) {
 
 	func_t*		fn = (func_t*)value;
 	*start		   = fn->start;
-	return fn->nparams;
+	return ((uint64_t)fn->nparams) | (((uint64_t)fn->nonparams) << UINT32_WIDTH);
 }
 
 static inline void sym_array_put(uint8_t* id, 
