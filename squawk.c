@@ -20,34 +20,27 @@
 #define SYMTBL_LEN_STEP		64
 
 typedef enum Symtype { 
-		STRING, INT, FLOAT, FUNCTION, 
+		STRING, INT, FLOAT, FUNCTION, BLOCK,
 		NONE, IORES, PIPE_STREAM, IO_STREAM,
 } symtype_t;
 
 typedef struct Function {
 	uint8_t*	id;
 	Inst*		start;
+	Inst*		end;
 	int		nparams;
-	int		nonparams;
 } func_t;
 
 typedef enum BlockState {
 	BEGIN_BLK, END_BLK, EXPR_BLK, PATT_BLK, NOEXPR_BLK,
 } blstat_t;
 
-typedef enum IoStat {
-	READSREC = 1,
-	GETSLINE = 2,
-	REGEX	 = 4,
-	EXPR	 = 8,
-	PRINTS	 = 16,
-	READS	 = 32,
-	WRITES	 = 64,
-	APPENDS  = 128,
-	HASVAR	 = 256,
-	PIPES	 = 512,
-	CLOSES	 = 1024,
-} iostat_t;
+typedef struct Block {
+	blstat_t 	stat;
+	uint8_t*	hitch;
+	Inst*		start;
+	Inst*		end;
+} blk_t;
 
 typedef struct Symbol {
 	uint64_t 	key;
@@ -98,7 +91,6 @@ typedef struct Squawk {
 	blstat_t	block_stat;
 	bool		block_range;
 	bool 		action_getline;
-	iostat_t	iostat;
 	uint8_t*	iotext;
 	uint8_t*	iorwmode;
 	uint8_t*	ioprompt;
@@ -167,7 +159,6 @@ static squawk_t* 	sq_state;
 #define RS		sq_state->rs
 #define RSTART		sq_state->rstart
 #define SUBSEP		sq_state->subsep
-#define IOSTAT		sq_state->iostat
 #define IOTEXT		sq_state->iotext
 #define IORESULT	sq_state->ioresult
 #define IORESLEN	sq_state->ioresultlen
@@ -418,33 +409,95 @@ static inline uint8_t* sym_str_get(uint8_t* id) {
 		return (uint8_t*)value;
 }
 
+static inline void sym_block_start(
+			uint8_t* 	id,
+			blstat_t	stat,
+			uint8_t*	hitch,
+			Inst*		start) {
+	blk_t*	blk 	= (blk_t*)GC_MALLOC(sizeof(blk_t));
 
+	blk->stat	= stat;
+	blk->start	= start;
+	blk->hitch	= hitch;
+	blk->end	= NULL;
 
-static inline void sym_func_put(
-		uint8_t* 	id, 
-		Inst* 		start, 
-		int 		nparams,
-		int 		nonparams) {
-	func_t*	fn = (func_t*)GC_MALLOC(sizeof(func_t));
-	fn->id 		= id;
+	sym_put(id, (uintptr_t)blk, BLOCK);
+}
+			
+static inline int sym_block_end(uint8_t* id, Inst* end) {
+	uintptr_t 	value;
+	symtype_t	symbol_type = sym_get(id, &value);
+	if (symbol_type != BLOCK)
+		return -1;
+	else {
+		blk_t* blk 	= (blk_t*)value;
+		blk->end 	= end;
+		sym_put(id, (uintptr_t)blk, BLOCK);
+	}
+	return 0;
+}
+
+static inline int sym_block_get(
+		uint8_t* id, 
+		Inst** start, 
+		Inst** end) {
+	uintptr_t	 value;
+	symtype_t	 symbol_type = sym_get(id, &value);
+	
+	if (symbol_type != BLOCK)
+		return -1;
+	else {
+		blk_t* blk 	= (blk_t*)value;
+		*start 		= blk->start;
+		*end   		= blk->end;
+	}
+	return 0;
+}
+
+static inline void sym_func_start(
+			uint8_t* 	id,
+			Inst*		start,
+			int		nparams) {
+	func_t*	fn 	= (func_t*)GC_MALLOC(sizeof(func_t));
+
 	fn->start	= start;
 	fn->nparams	= nparams;
-	fn->nonparams	= nonparams;
+	fn->end	= NULL;
+
 	sym_put(id, (uintptr_t)fn, FUNCTION);
 }
-
-static inline uint64_t sym_func_get(uint8_t* id, Inst** start) {
+			
+static inline int sym_func_end(uint8_t* id, Inst* end) {
 	uintptr_t 	value;
-	symtype_t  	symbol_type = sym_get(id, &value);
-	if (symbol_type != FUNCTION) {
-		fprintf(stderr, "Error: Identifier does not belong to function\n");
-		exit(EXIT_FAILURE);
+	symtype_t	symbol_type = sym_get(id, &value);
+	if (symbol_type != FUNCTION)
+		return -1;
+	else {
+		func_t* fn 	= (func_t*)value;
+		fn->end 	= end;
+		sym_put(id, (uintptr_t)fn, FUNCTION);
 	}
-
-	func_t*		fn = (func_t*)value;
-	*start		   = fn->start;
-	return ((uint64_t)fn->nparams) | (((uint64_t)fn->nonparams) << UINT32_WIDTH);
+	return 0;
 }
+
+static inline int sym_func_get(
+		uint8_t* id, 
+		Inst** start, 
+		Inst** end) {
+	uintptr_t	 value;
+	symtype_t	 symbol_type = sym_get(id, &value);
+	
+	if (symbol_type != FUNCTION)
+		return -1;
+	else {
+		func_t* fn 	= (func_t*)value;
+		*start 		= fn->start;
+		*end   		= fn->end;
+		return fn->nparams;
+	}
+	return 0;
+}
+
 
 static inline void sym_array_put(uint8_t* id, 
 				uint8_t*  index, 
@@ -507,8 +560,7 @@ static void sprint_default_vars(dflvar_t var) {
 			sym_put("ARGC", (uintptr_t)ARGC, STRING);
 			break;
 		case Fnr:
-			val = (BLKSTAT == BEGIN_BLK) ? 0 : RECORD_NUM;
-			FNR = NULL;
+			val = (BLKSTAT == BEGIN_BLK) ? 0 : RECORD_NUM;		  	       	   FNR = NULL;
 			FNR = (uint8_t*)GC_MALLOC(32);
 			sprintf(&FNR[0], "%lu", val);
 			sym_put("FNR", (uintptr_t)FNR, STRING);
@@ -682,9 +734,8 @@ static inline void stream_get(void) {
 	uintptr_t value 	= 0;
 	symtype_t symbol_type 	= sym_get(IOTEXT, &value);
 	if (symbol_type != NONE) {
-		if (symbol_type == PIPE_STREAM)
-			IOSTAT 		|= PIPES;
-		IOSTREAM = (FILE*)value;
+		IOISPIPE	= symbol_type == PIPE_STREAM;
+		IOSTREAM 	= (FILE*)value;
 	}
 }
 
