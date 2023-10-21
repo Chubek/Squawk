@@ -53,23 +53,23 @@ Esc	[abefnrtv'"\[\]\\]
 
 %%
 
-"BEGIN"			return BEG;
-"END"			return END;
-"break"			return BREAK;
-"continue"		return CONTINUE;
-"delete"		return DELETE;
-"do"			return DO;
-"else"			return ELSE;
-"exit"			return EXIT;
-"for"			return FOR;
-"function"		return FUNCTION;
-"if"			return IF;
-"in"			return IN;
-"next"			return NEXT;
-"print"			return PRINT;
-"printf"		return PRINTF;
-"while"			return WHILE;
-"return"		return RETURN;
+"BEGIN"			return Begin;
+"END"			return End;
+"break"			return Break;
+"continue"		return Continue;
+"delete"		return Delete;
+"do"			return Do;
+"else"			return Else;
+"exit"			return Exit;
+"for"			return For;
+"function"		return Function;
+"if"			return If;
+"in"			return In;
+"next"			return Next;
+"print"			return Print;
+"printf"		return Printf;
+"while"			return While;
+"return"		return Return;
 
 "atan2" 
 | "cos"
@@ -91,7 +91,7 @@ Esc	[abefnrtv'"\[\]\\]
 | "tolower"
 | "toupper"
 | "close"
-| "system"	     return BUILTIN;
+| "system"	     return BUILTIN_FUNC_NAME;
 
 
 [\/]		       BEGIN REG;
@@ -122,7 +122,7 @@ Esc	[abefnrtv'"\[\]\\]
 "*="		      return MUL_ASSIGN;
 "^="		      return POW_ASSIGN;
 "/="		      return DIV_ASSIGN;
-"%="		      return REM_ASSIGN;
+"%="		      return MOD_ASSIGN;
 
 "||"		      return OR;
 "&&"		      return AND;
