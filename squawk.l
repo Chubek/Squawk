@@ -100,7 +100,7 @@ Esc	[abefnrtv'"\[\]\\]
 {Bin}		     { yylval.int = strtoll(yytext, NULL, 2);	}
 {Hex}		     { yylval.int = strtoll(yytext, NULL, 16);  }
 {Oct}		     { yylval.int = strtoll(yytext, NULL, 8);   }
-{Ident}		     { yylval.idn = DUP(); return IDENT; 	}
+{Ident}		     { yylval.ident = DUP(); return IDENT; 	}
 
 "$"{Num}	     { yylval.fld = FLD(); return FIELD;	}
 
