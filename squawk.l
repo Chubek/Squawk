@@ -96,13 +96,14 @@ Esc	[abefnrtv'"\[\]\\]
 
 [\/]		       BEGIN REG;
 ['] | ["]	       BEGIN STR;
-{Int}		     { yylval.int = strtoll(yytext, NULL, 10); 	}
-{Bin}		     { yylval.int = strtoll(yytext, NULL, 2);	}
-{Hex}		     { yylval.int = strtoll(yytext, NULL, 16);  }
-{Oct}		     { yylval.int = strtoll(yytext, NULL, 8);   }
+{Int}		     { yylval.intg = strtoll(yytext, NULL, 10); }
+{Bin}		     { yylval.intg = strtoll(yytext, NULL, 2);	}
+{Hex}		     { yylval.intg = strtoll(yytext, NULL, 16); }
+{Oct}		     { yylval.intg = strtoll(yytext, NULL, 8);  }
+{Flt}		     { yylval.fltn = strtold(yytext, NULL);	}
 {Ident}		     { yylval.ident = DUP(); return IDENT; 	}
 
-"$"{Num}	     { yylval.fld = FLD(); return FIELD;	}
+"$"{Num}	     { yylval.fieldn = FLD(); return FIELD;	}
 
 <STR> "\\"	        BEGIN ESC;
 <STR> [^"]* | [^']*  { yylval.str = DUP(); return STRING; 	}
