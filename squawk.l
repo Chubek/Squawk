@@ -23,10 +23,12 @@ uint8_t* gc_strncat(uint8_t* str, uint8_t* cat, size_t len) {
 	return str;
 }
 
-#define DUP() gc_strndup(&yytext[0], yyleng
-#define CAT() gc_strncat(yylval.str, yytext, yyleng)
-#define MAP() gc_strncat(yylval.str, ESCAPE_MAP[yytext[0]], 1)
-#define FLD() strtoll(&yytext[1], NULL, 10)
+#define DUP() 	gc_strndup(&yytext[0], yyleng
+#define CAT() 	gc_strncat(yylval.str, yytext, yyleng)
+#define MAP() 	gc_strncat(yylval.str, ESCAPE_MAP[yytext[0]], 1)
+#define FLD() 	strtoll(&yytext[1], NULL, 10)
+#define INT(b) 	strtoll(&yyyext[0], NULL, b)
+#define LDB()	strtold(&yytext[0], NULL)
 
 extern YYSTYPE yylval;
 
@@ -96,12 +98,12 @@ Esc	[abefnrtv'"\[\]\\]
 
 [\/]		       BEGIN REG;
 ['] | ["]	       BEGIN STR;
-{Int}		     { yylval.intg = strtoll(yytext, NULL, 10); }
-{Bin}		     { yylval.intg = strtoll(yytext, NULL, 2);	}
-{Hex}		     { yylval.intg = strtoll(yytext, NULL, 16); }
-{Oct}		     { yylval.intg = strtoll(yytext, NULL, 8);  }
-{Flt}		     { yylval.fltn = strtold(yytext, NULL);	}
-{Ident}		     { yylval.ident = DUP(); return IDENT; 	}
+{Int}		     { yylval.intg = INT(10); return INTEGER;   }
+{Bin}		     { yylval.intg = INT(2);  return INTEGER;   }
+{Hex}		     { yylval.intg = INT(16); return INTEGER;   }
+{Oct}		     { yylval.intg = INT(8);  return INTEGER;   }
+{Flt}		     { yylval.fltn = LDB();   return FLOATNUM;	}
+{Ident}		     { yylval.ident = DUP();  return IDENT; 	}
 
 "$"{Num}	     { yylval.fieldn = FLD(); return FIELD;	}
 
