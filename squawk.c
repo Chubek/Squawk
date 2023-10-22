@@ -48,6 +48,7 @@ typedef struct Symbol {
 	uintptr_t	value;
 	symtype_t	type;
 	symbol_t*	next;
+	int 		index;
 } symbol_t;
 
 typedef struct Squawk {
@@ -174,6 +175,8 @@ static squawk_t* 	sq_state;
 #define IORWMODE	sq_state->iorwmode
 #define PARGV		sq_state->pargv
 #define PARGC		sq_state->pargc
+
+extern int locals;
 
 void do_on_exit(void) {
 	fclose(OUTPUT);
@@ -320,6 +323,7 @@ static void sym_put(uint8_t *id, uintptr_t value, symtype_t type)  {
 	table->key 	= key;
 	table->value	= value;
 	table->type    	= type;
+	table->index	= locals;
 	table->next	= NULL;
 	SYMTBL[bucket]	= table;
 	SYMTBL_CNT++;
@@ -341,6 +345,21 @@ static symtype_t sym_get(uint8_t* id, uintptr_t* value) {
 	}
 	return NONE;
 }
+
+static int sym_index(uint8_t* id) {
+	uint16_t  bucket  = djb2_hash(id) % SYMTBL_LEN;
+	symbol_t* table   = SYMTBL[bucket];
+
+	uint64_t key = hash64(id);
+	if (table) {
+		do {
+			if (table->key == key)
+				return table->index;
+		} while ((table = table->next));
+	}
+	return -1;
+}
+
 
 static void  sym_remove(uint8_t *id) {
 	uint16_t    bucket = djb2_hash(id) % SYMTBL_LEN;
