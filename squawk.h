@@ -27,6 +27,8 @@ static void sym_put(uint8_t *id,
 
 static symtype_t sym_get(uint8_t* id, uintptr_t *value);
 
+static int sym_index(uint8_t* id);
+
 static void sym_remove(uint8_t* id);
 
 static inline void sym_resize(void);
