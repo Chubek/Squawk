@@ -72,4 +72,19 @@ void vm_print_profile(FILE *file);
 long engine(Inst *ip0, Cell *sp, char *fp);
 long engine_debug(Inst *ip0, Cell *sp, char *fp);
 
+void genarg_i(Inst **vmcodepp, Cell i);
+void genarg_target(Inst **vmcodepp, Inst *target);
+void printarg_i(Cell i);
+void printarg_target(Inst *target);
+void printarg_a(char *a);
+void printarg_Cell(Cell i);
+
+static inline Inst* func_addr(uint8_t* id);
+static inline int func_calladjust(uint8_t* id);
+static inline int get_sym_offset(uint8_t* id);
+
+
+
+
+
 #endif
