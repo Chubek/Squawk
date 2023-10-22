@@ -35,10 +35,10 @@ int nonparams 	= 0;
 	Inst*		instp;
 }
 
-%token Begin   End
-%token Break   Continue   Delete   Do   Else
-%token Exit   For   Function   If   In
-%token Next   Print   Printf   Return   While
+%token Begin  End
+%token Break  Continue   Delete     Do       Else
+%token Exit   For        Function   If       In
+%token Next   Print      Printf     Return   While
 
 %token BUILTIN_FUNC_NAME
 
@@ -54,10 +54,64 @@ int nonparams 	= 0;
 %token '+' '-' '*' '%' '^' '!' '>' '<' '|' '?' ':' '˜' '$' '='
 
 %type <str> 	IDENT
-%type <str> 	REGEX
+%type <regex> 	REGEX
 %type <intg>	INTEGER
 %type <fltn>	FLOATNUM
 %type <fieldn>	FIELD
 
 %start awkprog
 %%
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+expr: term '+' term
+    | term '-' term
+    | term '*' term
+    | term '&' term
+    | term '|' term
+    | term '<' term
+    | term '>' term
+    | term '=' term
+    | term EQ  term
+    | term LE  term
+    | term GE  term
+    | term NE  term
+    | term OR  term
+    | term AND term
+    | INCR term
+    | DECR term
+    | '!' term
+    | '-' term
+    | term
+    ;
+
+term: '(' expr ')'
+    | IDENT '(' args ')'
+    | IDENT
+    | INTEGER
+    | FLOATNUM
+    | FIELD
+    ;
+
+
+args: expr ',' args
+    | expr
+    ;
+
+
+
