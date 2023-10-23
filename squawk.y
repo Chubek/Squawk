@@ -44,7 +44,7 @@ int nonparams 	= 0;
 
 %token ADD_ASSIGN SUB_ASSIGN MUL_ASSIGN DIV_ASSIGN MOD_ASSIGN POW_ASSIGN
 
-%token STRING REGEX 
+%token STRING REGEX
 %token INTEGER FLOATNUM
 %token FIELD
 
@@ -76,42 +76,6 @@ int nonparams 	= 0;
 
 
 
-
-
-
-expr: term '+' term
-    | term '-' term
-    | term '*' term
-    | term '&' term
-    | term '|' term
-    | term '<' term
-    | term '>' term
-    | term '=' term
-    | term EQ  term
-    | term LE  term
-    | term GE  term
-    | term NE  term
-    | term OR  term
-    | term AND term
-    | INCR term
-    | DECR term
-    | '!' term
-    | '-' term
-    | term
-    ;
-
-term: '(' expr ')'
-    | IDENT '(' args ')'
-    | IDENT
-    | INTEGER
-    | FLOATNUM
-    | FIELD
-    ;
-
-
-args: expr ',' args
-    | expr
-    ;
 
 
 

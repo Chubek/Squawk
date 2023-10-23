@@ -221,6 +221,11 @@ if (!s2) {
 	sym_put(s2, (uintptr_t)(*IORESULT), STRING);
 }
 
+getlinepipe ( #a -- )
+pipe_open();
+IORESULT = &s;
+stream_read();
+
 printnoredir ( i -- )
 while (--ARGC) {
 	puts(ARGV[ARGC]);
@@ -230,7 +235,11 @@ printfmtnodir ( i -- )
 uint8_t*	fmt = ARGV[0];
 print_formatted(stdout, fmt, &ARGV[1]);
 
-lit ( #i -- i )
+intlit ( #i -- i )
+
+strlit ( #s -- s )
+
+fltlit ( #f -- f )
 
 drop ( i -- )
 
@@ -297,6 +306,9 @@ vm_Cell2i(*(Cell *)(fp+ioffset),i);
 
 storelocal ( #ioffset i -- )
 vm_i2Cell(i,*(Cell *)(fp+ioffset));
+
+end ( i -- )
+return i;
 
 ll = loadlocal lit
 

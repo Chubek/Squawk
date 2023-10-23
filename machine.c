@@ -4,14 +4,30 @@
 #include "squawk.h"
 
 
-void genarg_i(Inst **vmcodepp, Cell i) {
-  *((Cell *) *vmcodepp) = i;
-  (*vmcodepp)++;
+void genarg_i(Inst **vmcodepp, long i) {
+   vm_i2Cell(i, *((Cell *) *vmcodepp));
+   (*vmcodepp)++;
 }
 
-void genarg_target(Inst **vmcodepp, Inst *target) {
-  *((Inst **) *vmcodepp) = target;
-  (*vmcodepp)++;
+void genarg_target(Inst **vmcodepp, Inst* target) {
+   vm_target2Cell(target, *((Cell *) *vmcodepp));
+   (*vmcodepp)++;
+}
+
+void genarg_target(Inst **vmcodepp, Inst* target) {
+
+   vm_target2Cell(target, *((Cell *) *vmcodepp));
+   (*vmcodepp)++;
+}
+
+void genarg_f(Inst **vmcodepp, long double f) {
+   vm_f2Cell(target, *((Cell *) *vmcodepp));
+   (*vmcodepp)++;
+}
+
+void genarg_s(Inst **vmcodepp, unsigned char* s) {
+   vm_s2Cell(target, *((Cell *) *vmcodepp));
+   (*vmcodepp)++;
 }
 
 void printarg_i(Cell i) {
